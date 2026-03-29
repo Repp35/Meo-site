@@ -1342,8 +1342,25 @@ async function _loadSession() {
   const sess = getSession();
   if (!sess) return;
 
-  const user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
-  if (!user) { clearSession(); return; }
+  // tenta buscar do banco com retry
+  let user = null;
+  for (let i = 0; i < 3; i++) {
+    user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
+    if (user !== null) break;
+    await new Promise(r => setTimeout(r, 800)); // aguarda 800ms antes de tentar de novo
+  }
+
+  // se falhou todas as tentativas, mantém sessão mas usa cache local
+  if (!user) {
+    const cached = LS.get(`ghost_user_cache_${sess.email}`);
+    if (cached) {
+      currentUser = cached;
+      queryCounters = await getDailyCounters(cached.email, cached.plan);
+      updateNavUser();
+    }
+    // NÃO limpa a sessão — pode ser falha de rede
+    return;
+  }
 
   // verifica expiração do plano
   if (user.plan_expires_at && Date.now() > new Date(user.plan_expires_at).getTime() && user.plan !== 'basico') {
@@ -1367,6 +1384,10 @@ async function _loadSession() {
     avatar_url: user.avatar_url || null,
     _credits:   user.credits || 0,
   };
+
+  // salva cache local pra fallback
+  LS.set(`ghost_user_cache_${user.email}`, currentUser);
+
   updateNavUser();
 }
 
