@@ -5,42 +5,121 @@ const PLAN_LIMITS = {
   premium: { label:'Premium', cpf:-1, cpfpro:-1, cnpj:-1, cep:-1, ip:-1, whois:-1, nome:-1, familiares:-1, telefone:-1, email:-1, placa:-1, cnh:-1, foto:2,  pix:-1,  cns:-1,  renavam:-1,  total:999 },
 };
 
+// ── SUPABASE CONFIG ──
+const SUPABASE_URL  = 'https://wpdjetsomlvmlnkpkwja.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZGpldHNvbWx2bWxua3Brd2phIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTc3MTIsImV4cCI6MjA5MDMzMzcxMn0.Ggboop89c8yb8pSjIqBtFnUgjpf6jPT988qcAE8bBVA';
+const SB_HEADERS    = { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON };
+
+async function sbGet(table, query='') {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: SB_HEADERS });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d : null;
+  } catch { return null; }
+}
+async function sbGetOne(table, query='') {
+  const d = await sbGet(table, query + '&limit=1');
+  return d?.[0] || null;
+}
+async function sbPost(table, body) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST', headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d[0] : d;
+  } catch { return null; }
+}
+async function sbPatch(table, query, body) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+      method: 'PATCH', headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d[0] : d;
+  } catch { return null; }
+}
+async function sbUpsert(table, body, onConflict) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
+      method: 'POST', headers: { ...SB_HEADERS, 'Prefer': 'return=representation,resolution=merge-duplicates' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d[0] : d;
+  } catch { return null; }
+}
+
+// ── SUPABASE STORAGE — avatars ──
+async function sbUploadAvatar(email, blob) {
+  try {
+    const ext  = blob.type === 'image/png' ? 'png' : 'jpg';
+    const path = `avatars/${email.replace(/[^a-z0-9]/gi,'_')}.${ext}`;
+    // remove arquivo antigo primeiro (ignora erro)
+    await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${path}`, {
+      method: 'DELETE', headers: SB_HEADERS
+    }).catch(()=>{});
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${path}`, {
+      method: 'POST', headers: { ...SB_HEADERS, 'Content-Type': blob.type, 'x-upsert': 'true' },
+      body: blob
+    });
+    if (!r.ok) return null;
+    return `${SUPABASE_URL}/storage/v1/object/public/avatars/${path}?t=${Date.now()}`;
+  } catch { return null; }
+}
+
 // ── ESTADO DO USUÁRIO ──
 let currentUser = null; // { name, email, plan }
 let queryCounters = {}; // { cpf: 3, nome: 1, ... }
 let activeCoupon = null;
 
 // ════════════════════════════════════════════
-// ── AUTH & CONTA — localStorage Demo ──
+// ── AUTH & CONTA — Supabase ──
 // ════════════════════════════════════════════
 
-// ── helpers de storage ──
+// ── helpers de storage local (apenas para anônimos e cache leve) ──
 const LS = {
   get:  k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set:  (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   del:  k => { try { localStorage.removeItem(k); } catch {} },
 };
 
-// ── banco de usuários (demo — localStorage) ──
-function getUsers()          { return LS.get('ghost_users') || {}; }
-function saveUsers(db)       { LS.set('ghost_users', db); }
-function getSession()        { return LS.get('ghost_session'); }   // { email, loggedAt }
+// ── sessão via localStorage (referência ao email logado) ──
+function getSession()        { return LS.get('ghost_session'); }
 function saveSession(email)  { LS.set('ghost_session', { email, loggedAt: Date.now() }); }
 function clearSession()      { LS.del('ghost_session'); }
 
-// ── contadores diários ──
-// { date:'2026-03-21', counters:{ cpf:3, cnpj:1 } }
+// ── contadores diários — Supabase com fallback localStorage ──
 function todayStr() { return new Date().toISOString().slice(0,10); }
-function getDailyCounters(email, plan) {
-  const p   = plan || 'basico';
-  const key = `ghost_daily_${email}_${p}`;
+
+async function getDailyCounters(email, plan) {
+  const p = plan || 'basico';
+  try {
+    const row = await sbGetOne('daily_counters',
+      `user_key=eq.${encodeURIComponent(email)}&plan=eq.${p}&date=eq.${todayStr()}`);
+    if (row) return row.counters || {};
+  } catch {}
+  // fallback: tenta localStorage
+  const key  = `ghost_daily_${email}_${p}`;
   const data = LS.get(key);
   if (data && data.date === todayStr()) return data.counters || {};
-  LS.set(key, { date: todayStr(), counters: {} });
   return {};
 }
-function saveDailyCounters(email, counters, plan) {
-  const p   = plan || currentUser?.plan || 'basico';
+
+async function saveDailyCounters(email, counters, plan) {
+  const p = plan || currentUser?.plan || 'basico';
+  try {
+    await sbUpsert('daily_counters',
+      { user_key: email, plan: p, date: todayStr(), counters },
+      'user_key,plan,date');
+  } catch {}
+  // espelho em localStorage
   LS.set(`ghost_daily_${email}_${p}`, { date: todayStr(), counters });
 }
 
@@ -53,16 +132,14 @@ function getOrCreateAnonId() {
   return id;
 }
 function initAnon() {
-  // só inicia anônimo se não há sessão ativa
-  if (getSession()) return;
   const anonId = getOrCreateAnonId();
-  queryCounters = getDailyCounters(anonId, 'basico');
-  // usuário anônimo sempre recebe plano básico
+  const cached = LS.get(`ghost_daily_${anonId}_basico`);
+  queryCounters = (cached && cached.date === todayStr()) ? (cached.counters || {}) : {};
   currentUser = { name: 'Visitante', email: anonId, plan: 'basico', anon: true };
 }
 // override: persistir contador p/ anônimo também
 function _persistCountersAnon() {
-  if (currentUser) saveDailyCounters(currentUser.email, queryCounters);
+  if (currentUser) LS.set(`ghost_daily_${currentUser.email}_basico`, { date: todayStr(), counters: queryCounters });
 }
 
 // ════════════════════════════════════════
@@ -320,11 +397,17 @@ const CREDIT_DISCOUNTS = [
 
 function getCredits(email) {
   if (!email) return 0;
+  // usa cache em memória se disponível (atualizado ao fazer login)
+  if (currentUser && currentUser.email === email && typeof currentUser._credits === 'number') return currentUser._credits;
   return LS.get(`ghost_credits_${email}`) || 0;
 }
 function setCredits(email, val) {
   if (!email) return;
-  LS.set(`ghost_credits_${email}`, Math.max(0, Math.round(val * 100) / 100));
+  const v = Math.max(0, Math.round(val * 100) / 100);
+  LS.set(`ghost_credits_${email}`, v);
+  if (currentUser && currentUser.email === email) currentUser._credits = v;
+  // persiste no banco de forma assíncrona
+  sbPatch('users', `email=eq.${encodeURIComponent(email)}`, { credits: v }).catch(()=>{});
 }
 function addCredits(email, val) {
   setCredits(email, getCredits(email) + val);
@@ -343,10 +426,29 @@ function getDiscount(brl) {
 
 // ── CARTEIRA DIGITAL ──
 function getUserAvatar(email) {
+  if (!email) return null;
+  // avatar_url vem do banco ao fazer login, guardado em currentUser
+  if (currentUser && currentUser.email === email && currentUser.avatar_url) return currentUser.avatar_url;
   return LS.get(`ghost_avatar_${email}`) || null;
 }
-function setUserAvatar(email, base64) {
-  LS.set(`ghost_avatar_${email}`, base64);
+async function setUserAvatar(email, base64OrBlob) {
+  let url = null;
+  if (base64OrBlob instanceof Blob) {
+    url = await sbUploadAvatar(email, base64OrBlob);
+  } else if (typeof base64OrBlob === 'string' && base64OrBlob.startsWith('data:')) {
+    // converte base64 para Blob
+    const res  = await fetch(base64OrBlob);
+    const blob = await res.blob();
+    url = await sbUploadAvatar(email, blob);
+  }
+  if (url) {
+    await sbPatch('users', `email=eq.${encodeURIComponent(email)}`, { avatar_url: url });
+    if (currentUser && currentUser.email === email) currentUser.avatar_url = url;
+    LS.set(`ghost_avatar_${email}`, url);
+  } else {
+    // fallback: guarda base64 só em localStorage
+    LS.set(`ghost_avatar_${email}`, base64OrBlob);
+  }
 }
 
 function goWallet() {
@@ -490,8 +592,7 @@ function triggerAvatarUpload() {
     const reader = new FileReader();
     reader.onload = ev => {
       const img = new Image();
-      img.onload = () => {
-        // Comprime automaticamente para max 400px, sem limite de tamanho de arquivo
+      img.onload = async () => {
         const MAX = 400;
         let w = img.width, h = img.height;
         if (w > MAX || h > MAX) {
@@ -504,7 +605,7 @@ function triggerAvatarUpload() {
         const compressed = canvas.toDataURL('image/jpeg', 0.88);
         const avatarEl = document.querySelector('.settings-avatar');
         if (avatarEl) { avatarEl.classList.remove('avatar-swapping'); void avatarEl.offsetWidth; avatarEl.classList.add('avatar-swapping'); setTimeout(()=>avatarEl.classList.remove('avatar-swapping'),500); }
-        setUserAvatar(currentUser.email, compressed);
+        await setUserAvatar(currentUser.email, compressed);
         updateNavUser();
         renderSettings();
       };
@@ -519,7 +620,12 @@ function removeAvatar() {
   if (currentUser?.email) {
     const avatarEl = document.querySelector('.settings-avatar');
     if (avatarEl) { avatarEl.classList.remove('avatar-swapping'); void avatarEl.offsetWidth; avatarEl.classList.add('avatar-swapping'); }
-    setTimeout(() => { LS.set(`ghost_avatar_${currentUser.email}`, null); updateNavUser(); renderSettings(); }, 220);
+    setTimeout(async () => {
+      LS.set(`ghost_avatar_${currentUser.email}`, null);
+      if (currentUser) currentUser.avatar_url = null;
+      await sbPatch('users', `email=eq.${encodeURIComponent(currentUser.email)}`, { avatar_url: null });
+      updateNavUser(); renderSettings();
+    }, 220);
   }
 }
 let _creditsInfoMod = null;
@@ -1116,7 +1222,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ── registrar ──
-function submitRegister(btn) {
+async function submitRegister(btn) {
   const overlay = document.getElementById('modal-register');
   const inputs  = overlay.querySelectorAll('.modal-input');
   const nomeEl  = inputs[0], emailEl = inputs[1], senhaEl = inputs[2];
@@ -1134,37 +1240,42 @@ function submitRegister(btn) {
   if (senha.length < 5)                             shakeInp(senhaEl);
   if (!ok) return;
 
-  const users = getUsers();
-  if (users[email]) {
-    emailEl.style.borderColor = 'rgba(248,113,113,.6)';
-    showModalErr(overlay, 'Este e-mail já está cadastrado.');
-    return;
-  }
-
   const orig = btn.textContent;
   btn.textContent = 'Criando conta...'; btn.style.opacity = '.7'; btn.disabled = true;
 
-  setTimeout(() => {
-    // salva usuário
-    users[email] = { nome, email, senha, plan: 'basico', createdAt: Date.now(), welcomeCouponUsed: false };
-    saveUsers(users);
-    saveSession(email);
+  // verifica se email já existe
+  const existing = await sbGetOne('users', `email=eq.${encodeURIComponent(email)}`);
+  if (existing) {
+    emailEl.style.borderColor = 'rgba(248,113,113,.6)';
+    showModalErr(overlay, 'Este e-mail já está cadastrado.');
+    btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
+    return;
+  }
 
-    btn.textContent = '✓ Conta criada!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
-    setTimeout(() => {
-      closeModal('modal-register');
-      btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
-      [nomeEl, emailEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
-      clearModalErr(overlay);
-      _loadSession(); // loga imediatamente
-      // mostra modal do cupom de boas-vindas após pequeno delay
-      setTimeout(() => showWelcomeCouponModal(), 600);
-    }, 700);
-  }, 800);
+  const newUser = await sbPost('users', {
+    email, nome, senha, plan: 'basico', credits: 0, welcome_coupon_used: false
+  });
+
+  if (!newUser) {
+    showModalErr(overlay, 'Erro ao criar conta. Tente novamente.');
+    btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
+    return;
+  }
+
+  saveSession(email);
+  btn.textContent = '✓ Conta criada!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+  setTimeout(() => {
+    closeModal('modal-register');
+    btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
+    [nomeEl, emailEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
+    clearModalErr(overlay);
+    _loadSession();
+    setTimeout(() => showWelcomeCouponModal(), 600);
+  }, 700);
 }
 
 // ── login ──
-function submitLogin(btn) {
+async function submitLogin(btn) {
   const overlay  = document.getElementById('modal-login');
   const identEl  = document.getElementById('login-identifier');
   const senhaEl  = document.getElementById('login-pw');
@@ -1183,31 +1294,34 @@ function submitLogin(btn) {
   const orig = btn.textContent;
   btn.textContent = 'Entrando...'; btn.style.opacity = '.7'; btn.disabled = true;
 
-  setTimeout(() => {
-    const users = getUsers();
-    let userEmail = identifier;
-    let user = users[identifier];
-    if (!user) {
-      const found = Object.entries(users).find(([,u]) => u.nome?.toLowerCase() === identifier);
-      if (found) { userEmail = found[0]; user = found[1]; }
-    }
+  // busca por email ou nome
+  let user = await sbGetOne('users', `email=eq.${encodeURIComponent(identifier)}`);
+  if (!user) {
+    const byName = await sbGet('users', `nome=ilike.${encodeURIComponent(identifier)}&limit=1`);
+    user = byName?.[0] || null;
+  }
 
-    if (!user || user.senha !== senha) {
-      btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
-      [identEl, senhaEl].forEach(i => i.style.borderColor = 'rgba(248,113,113,.6)');
-      showModalErr(overlay, 'Usuário ou senha incorretos.');
-      return;
-    }
+  if (!user || user.senha !== senha) {
+    btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
+    [identEl, senhaEl].forEach(i => i.style.borderColor = 'rgba(248,113,113,.6)');
+    showModalErr(overlay, 'Usuário ou senha incorretos.');
+    return;
+  }
 
-    saveSession(userEmail);
-    btn.textContent = '✓ Bem-vindo!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
-    setTimeout(() => {
-      closeModal('modal-login');
-      btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
-      [identEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
-      clearModalErr(overlay);
-      _loadSession();
-    }, 700);
+  if (user.banned) {
+    btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
+    showModalErr(overlay, 'Conta suspensa. Entre em contato com o suporte.');
+    return;
+  }
+
+  saveSession(user.email);
+  btn.textContent = '✓ Bem-vindo!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+  setTimeout(async () => {
+    closeModal('modal-login');
+    btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
+    [identEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
+    clearModalErr(overlay);
+    await _loadSession();
   }, 700);
 }
 
@@ -1223,25 +1337,35 @@ function clearModalErr(overlay) {
 }
 
 // ── carrega sessão salva ao iniciar ──
-function _loadSession() {
-  const sess  = getSession();
+async function _loadSession() {
+  const sess = getSession();
   if (!sess) return;
-  const users = getUsers();
-  const user  = users[sess.email];
+
+  const user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
   if (!user) { clearSession(); return; }
 
   // verifica expiração do plano
-  if (user.planExpiresAt && Date.now() > user.planExpiresAt && user.plan !== 'basico') {
+  if (user.plan_expires_at && Date.now() > new Date(user.plan_expires_at).getTime() && user.plan !== 'basico') {
+    await sbPatch('users', `email=eq.${encodeURIComponent(user.email)}`, { plan: 'basico', plan_expires_at: null });
     user.plan = 'basico';
-    delete user.planExpiresAt;
-    users[sess.email] = user;
-    const allUsers = getUsers();
-    allUsers[sess.email] = user;
-    LS.set('ghost_users', allUsers);
+    user.plan_expires_at = null;
   }
 
-  queryCounters = getDailyCounters(user.email, user.plan);
-  currentUser = { name: user.nome, email: user.email, plan: user.plan };
+  queryCounters = await getDailyCounters(user.email, user.plan);
+
+  // cache local dos créditos
+  LS.set(`ghost_credits_${user.email}`, user.credits || 0);
+  // cache local do avatar
+  if (user.avatar_url) LS.set(`ghost_avatar_${user.email}`, user.avatar_url);
+
+  currentUser = {
+    name:       user.nome,
+    email:      user.email,
+    plan:       user.plan,
+    planExpiresAt: user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : null,
+    avatar_url: user.avatar_url || null,
+    _credits:   user.credits || 0,
+  };
   updateNavUser();
 }
 
@@ -1249,7 +1373,7 @@ function _loadSession() {
 
 // ── salva contador a cada consulta ──
 function _persistCounters() {
-  if (currentUser) saveDailyCounters(currentUser.email, queryCounters);
+  if (currentUser) saveDailyCounters(currentUser.email, queryCounters, currentUser.plan);
 }
 
 // ── settings: editar nome e senha ──
@@ -1278,7 +1402,7 @@ function saveProfileChanges() {
   _doSaveProfile();
 }
 
-function _doSaveProfile() {
+async function _doSaveProfile() {
   if (!currentUser) return;
   const nomeEl  = document.getElementById('set-nome');
   const senhaEl = document.getElementById('set-senha');
@@ -1289,13 +1413,15 @@ function _doSaveProfile() {
   const newNome  = nomeEl?.value.trim();
   const newSenha = senhaEl?.value;
 
-  const users = getUsers();
-  const u     = users[currentUser.email];
-  if (!u) return;
+  const patch = { nome: newNome };
+  if (newSenha) patch.senha = newSenha;
 
-  u.nome = newNome;
-  if (newSenha) u.senha = newSenha;
-  saveUsers(users);
+  const updated = await sbPatch('users', `email=eq.${encodeURIComponent(currentUser.email)}`, patch);
+  if (!updated) {
+    if (msgEl) { msgEl.textContent = 'Erro ao salvar. Tente novamente.'; msgEl.className = 'set-msg err'; }
+    return;
+  }
+
   currentUser.name = newNome;
   updateNavUser();
 
@@ -2263,41 +2389,30 @@ document.addEventListener('click', e => {
 
 // ── CUPOM ──
 // ── PLANOS E LIMITES ──
-function loginUser(name, email, plan, days) {
+async function loginUser(name, email, plan, days) {
   const oldPlan = currentUser?.plan || 'basico';
-  const users = getUsers();
 
-  // bloqueia plano duplicado — só atualiza se for diferente
-  if (users[email] && users[email].plan === plan && plan !== 'basico') {
-    // já tem esse plano — estende a validade
-    const extra = (days || 0) * 86400000;
-    const current = users[email].planExpiresAt || Date.now();
-    users[email].planExpiresAt = Math.max(current, Date.now()) + extra;
-    saveUsers(users);
-    currentUser.plan = plan;
-    updateNavUser();
-    return;
-  }
-
-  if (!users[email]) {
-    users[email] = { nome: name, email, senha: '', plan, createdAt: Date.now() };
-  } else {
-    users[email].plan = plan;
-    if (name && name !== 'Usuário') users[email].nome = name;
-  }
-
-  // define expiração
+  let expiresAt = null;
   if (days && days > 0) {
-    users[email].planExpiresAt = Date.now() + days * 86400000;
-  } else {
-    delete users[email].planExpiresAt;
+    // se já tem plano igual, estende
+    const existing = await sbGetOne('users', `email=eq.${encodeURIComponent(email)}`);
+    if (existing && existing.plan === plan && plan !== 'basico' && existing.plan_expires_at) {
+      const current = new Date(existing.plan_expires_at).getTime();
+      expiresAt = new Date(Math.max(current, Date.now()) + days * 86400000).toISOString();
+    } else {
+      expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+    }
   }
 
-  saveUsers(users);
+  const patch = { plan };
+  if (name && name !== 'Usuário') patch.nome = name;
+  patch.plan_expires_at = expiresAt;
+
+  await sbPatch('users', `email=eq.${encodeURIComponent(email)}`, patch);
+
   saveSession(email);
-  currentUser = { name: users[email].nome, email, plan };
-  // contadores são por plano — ao mudar de plano, zera e começa do zero
-  queryCounters = getDailyCounters(email, plan);
+  currentUser = { ...currentUser, name: name || currentUser?.name, email, plan, planExpiresAt: expiresAt ? new Date(expiresAt).getTime() : null };
+  queryCounters = await getDailyCounters(email, plan);
   updateNavUser();
 
   const planOrder = ['basico','starter','pro','premium'];
@@ -2523,12 +2638,11 @@ function renderSettings() {
   const totalLim = limits.total === 999 ? '∞' : limits.total;
   const planClass= 'plan-badge-' + currentUser.plan;
 
-  const users = getUsers();
-  const u = users[currentUser.email];
+  const planExpiresAt = currentUser.planExpiresAt || null;
   let expiryHtml = '';
   let expiryBanner = '';
-  if (u?.planExpiresAt) {
-    const days = Math.ceil((u.planExpiresAt - Date.now()) / 86400000);
+  if (planExpiresAt) {
+    const days = Math.ceil((planExpiresAt - Date.now()) / 86400000);
     const color = days <= 2 ? '#f87171' : days <= 5 ? '#fbbf24' : '#4ade80';
     if (days > 0) {
       expiryHtml = `<div class="settings-row"><span class="settings-row-label">Expira em</span><span class="settings-row-val" style="color:${color};font-weight:700">${days} dia${days !== 1 ? 's' : ''}</span></div>`;
@@ -3578,15 +3692,15 @@ document.querySelectorAll('.page').forEach(p => {
     }).observe(cinfoPage, {attributes: true, attributeFilter: ['class']});
   }
 })();
-try { history.replaceState({page:'home'}, '', location.href); } catch(_) {}
-showPage('home', false);
 
-document.addEventListener('DOMContentLoaded', function() {
-  _loadSession();
+// ── INICIALIZAÇÃO PRINCIPAL ──
+(async function() {
+  try { history.replaceState({page:'home'}, '', location.href); } catch(_) {}
+  showPage('home', false);
+  await _loadSession();
   if (!currentUser) initAnon();
-  // banner de desconto pra visitantes
   setTimeout(function() { initDiscountBanner(); }, 500);
-});
+})();
 
 // ── CONTADOR DE CONSULTAS EM TEMPO REAL ──
 (function(){
@@ -4143,19 +4257,15 @@ function buyPlan(plan, btn) {
 
   // TODO: integrar com gateway de pagamento (Mercado Pago, Stripe, etc.)
   // Por enquanto: aprovação automática (modo demo)
-  setTimeout(() => {
-    const oldPlan = currentUser.plan;
-    const users   = getUsers();
-    const u       = users[currentUser.email];
-    if (u) {
-      u.plan           = plan;
-      u.planExpiresAt  = Date.now() + PLAN_DURATIONS[plan] * 86400000;
-      saveUsers(users);
-      currentUser.plan = plan;
-      queryCounters    = getDailyCounters(currentUser.email, plan);
-      updateNavUser();
-      histAdd({ type:'plano', name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`, value: (PLAN_PRICES[plan]||'').replace('R$','').replace('/mês','').trim()||null, free: false });
-    }
+  setTimeout(async () => {
+    const oldPlan    = currentUser.plan;
+    const expiresAt  = new Date(Date.now() + PLAN_DURATIONS[plan] * 86400000).toISOString();
+    await sbPatch('users', `email=eq.${encodeURIComponent(currentUser.email)}`, { plan, plan_expires_at: expiresAt });
+    currentUser.plan         = plan;
+    currentUser.planExpiresAt = Date.now() + PLAN_DURATIONS[plan] * 86400000;
+    queryCounters = await getDailyCounters(currentUser.email, plan);
+    updateNavUser();
+    histAdd({ type:'plano', name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`, value: (PLAN_PRICES[plan]||'').replace('R$','').replace('/mês','').trim()||null, free: false });
     if (btn) { btn.innerHTML = orig; btn.disabled = false; }
 
     // fecha menu se aberto
@@ -4376,13 +4486,8 @@ function showWelcomeCouponModal() {
 function closeWelcomeCouponModal() {
   const el = document.getElementById('welcomeCouponModal');
   if (el) el.classList.remove('open');
-  // marca cupom como visto/usado na conta
   if (currentUser && !currentUser.anon) {
-    var users = getUsers();
-    if (users[currentUser.email]) {
-      users[currentUser.email].welcomeCouponUsed = true;
-      saveUsers(users);
-    }
+    sbPatch('users', `email=eq.${encodeURIComponent(currentUser.email)}`, { welcome_coupon_used: true }).catch(()=>{});
   }
 }
 
