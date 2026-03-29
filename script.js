@@ -11,73 +11,37 @@ let queryCounters = {}; // { cpf: 3, nome: 1, ... }
 let activeCoupon = null;
 
 // ════════════════════════════════════════════
-// ── SUPABASE CONFIG ──
+// ── AUTH & CONTA — localStorage Demo ──
 // ════════════════════════════════════════════
-const SUPA_URL = 'https://wpdjetsomlvmlnkpkwja.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZGpldHNvbWx2bWxua3Brd2phIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDc1NzcxMiwiZXhwIjoyMDkwMzMzNzEyfQ.9g7F9h6rXPOqEKS1KWID7pWZr1Wi_t3kG3kldgjA7f8';
-const _supa = window.supabase ? window.supabase.createClient(SUPA_URL, SUPA_KEY) : null;
 
-// ── helpers de storage local (apenas para session/anon/cursor) ──
+// ── helpers de storage ──
 const LS = {
   get:  k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set:  (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   del:  k => { try { localStorage.removeItem(k); } catch {} },
 };
 
-// ── sessão ──
-function getSession()        { return LS.get('ghost_session'); }
+// ── banco de usuários (demo — localStorage) ──
+function getUsers()          { return LS.get('ghost_users') || {}; }
+function saveUsers(db)       { LS.set('ghost_users', db); }
+function getSession()        { return LS.get('ghost_session'); }   // { email, loggedAt }
 function saveSession(email)  { LS.set('ghost_session', { email, loggedAt: Date.now() }); }
 function clearSession()      { LS.del('ghost_session'); }
 
-// ── usuários — agora lidos do Supabase ──
-// cache local para não bater na API a cada chamada síncrona
-let _usersCache = {};
-
-async function _fetchUsers() {
-  if (!_supa) return;
-  const { data } = await _supa.from('users').select('*');
-  if (data) {
-    _usersCache = {};
-    data.forEach(u => { _usersCache[u.email] = { nome: u.nome, email: u.email, senha: u.senha, plan: u.plan, planExpiresAt: u.plan_expires_at ? new Date(u.plan_expires_at).getTime() : null, credits: u.credits, avatar: u.avatar_url, banned: u.banned, welcomeCouponUsed: u.welcome_coupon_used, createdAt: new Date(u.created_at).getTime() }; });
-  }
-}
-
-function getUsers()     { return _usersCache; }
-function saveUsers(db)  {
-  // atualiza cache e persiste cada usuário alterado
-  Object.entries(db).forEach(([email, u]) => {
-    _usersCache[email] = u;
-    if (_supa) {
-      _supa.from('users').upsert({ email, nome: u.nome, senha: u.senha, plan: u.plan || 'basico', plan_expires_at: u.planExpiresAt ? new Date(u.planExpiresAt).toISOString() : null, credits: u.credits ?? 0, avatar_url: u.avatar || null, banned: u.banned || false, welcome_coupon_used: u.welcomeCouponUsed || false }, { onConflict: 'email' }).then(() => {});
-    }
-  });
-}
-
 // ── contadores diários ──
+// { date:'2026-03-21', counters:{ cpf:3, cnpj:1 } }
 function todayStr() { return new Date().toISOString().slice(0,10); }
-
-// cache local de contadores (evita múltiplas chamadas async)
-let _countersCache = {};
-
-async function _fetchCounters(userKey, plan) {
-  const p = plan || 'basico';
-  if (!_supa) return {};
-  const { data } = await _supa.from('daily_counters').select('counters').eq('user_key', userKey).eq('plan', p).eq('date', todayStr()).single();
-  return data?.counters || {};
-}
-
 function getDailyCounters(email, plan) {
-  const key = `${email}_${plan || 'basico'}`;
-  return _countersCache[key] || {};
+  const p   = plan || 'basico';
+  const key = `ghost_daily_${email}_${p}`;
+  const data = LS.get(key);
+  if (data && data.date === todayStr()) return data.counters || {};
+  LS.set(key, { date: todayStr(), counters: {} });
+  return {};
 }
-
 function saveDailyCounters(email, counters, plan) {
   const p   = plan || currentUser?.plan || 'basico';
-  const key = `${email}_${p}`;
-  _countersCache[key] = counters;
-  if (_supa) {
-    _supa.from('daily_counters').upsert({ user_key: email, plan: p, date: todayStr(), counters }, { onConflict: 'user_key,plan,date' }).then(() => {});
-  }
+  LS.set(`ghost_daily_${email}_${p}`, { date: todayStr(), counters });
 }
 
 // ════════════════════════════════════════
@@ -356,14 +320,11 @@ const CREDIT_DISCOUNTS = [
 
 function getCredits(email) {
   if (!email) return 0;
-  const u = _usersCache[email];
-  return u?.credits ?? 0;
+  return LS.get(`ghost_credits_${email}`) || 0;
 }
 function setCredits(email, val) {
   if (!email) return;
-  const v = Math.max(0, Math.round(val * 100) / 100);
-  if (_usersCache[email]) _usersCache[email].credits = v;
-  if (_supa) _supa.from('users').update({ credits: v }).eq('email', email).then(() => {});
+  LS.set(`ghost_credits_${email}`, Math.max(0, Math.round(val * 100) / 100));
 }
 function addCredits(email, val) {
   setCredits(email, getCredits(email) + val);
@@ -382,11 +343,10 @@ function getDiscount(brl) {
 
 // ── CARTEIRA DIGITAL ──
 function getUserAvatar(email) {
-  return _usersCache[email]?.avatar || null;
+  return LS.get(`ghost_avatar_${email}`) || null;
 }
 function setUserAvatar(email, base64) {
-  if (_usersCache[email]) _usersCache[email].avatar = base64;
-  if (_supa) _supa.from('users').update({ avatar_url: base64 }).eq('email', email).then(() => {});
+  LS.set(`ghost_avatar_${email}`, base64);
 }
 
 function goWallet() {
@@ -1027,7 +987,7 @@ function showPage(id, pushHistory = true) {
   else { nav.classList.add('hidden'); closeMenu(); } // fecha menu ao sair da home
   if (storeHero) storeHero.style.display = id === 'store' ? 'flex' : 'none';
   if (id === 'modules') { updateBalloon(); updateCpfProCard(); updateCreditsBalloon(); updateModulesBanner(); }
-  if (id === 'chat')     { _renderChatUserAvatar(); _setChatWelcomeTime(); _loadChatMessages(); }
+  if (id === 'chat')     { _renderChatUserAvatar(); _setChatWelcomeTime(); _renderChatMessages(); }
   if (id === 'thankyou')  { const q = document.getElementById('tyQuestion'); if(q) { q.style.opacity=''; q.style.transform=''; q.style.transition=''; } }
   if (pushHistory) {
     const state = {page: id, mod: curMod};
@@ -1174,7 +1134,8 @@ function submitRegister(btn) {
   if (senha.length < 5)                             shakeInp(senhaEl);
   if (!ok) return;
 
-  if (_usersCache[email]) {
+  const users = getUsers();
+  if (users[email]) {
     emailEl.style.borderColor = 'rgba(248,113,113,.6)';
     showModalErr(overlay, 'Este e-mail já está cadastrado.');
     return;
@@ -1183,17 +1144,10 @@ function submitRegister(btn) {
   const orig = btn.textContent;
   btn.textContent = 'Criando conta...'; btn.style.opacity = '.7'; btn.disabled = true;
 
-  (async () => {
-    if (_supa) {
-      const { error } = await _supa.from('users').insert({ email, nome, senha, plan: 'basico', credits: 0 });
-      if (error) {
-        btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
-        showModalErr(overlay, 'Erro ao criar conta. Tente novamente.');
-        return;
-      }
-    }
-    // atualiza cache
-    _usersCache[email] = { nome, email, senha, plan: 'basico', credits: 0, createdAt: Date.now(), welcomeCouponUsed: false };
+  setTimeout(() => {
+    // salva usuário
+    users[email] = { nome, email, senha, plan: 'basico', createdAt: Date.now(), welcomeCouponUsed: false };
+    saveUsers(users);
     saveSession(email);
 
     btn.textContent = '✓ Conta criada!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
@@ -1202,10 +1156,11 @@ function submitRegister(btn) {
       btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
       [nomeEl, emailEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
       clearModalErr(overlay);
-      _loadSession();
+      _loadSession(); // loga imediatamente
+      // mostra modal do cupom de boas-vindas após pequeno delay
       setTimeout(() => showWelcomeCouponModal(), 600);
     }, 700);
-  })();
+  }, 800);
 }
 
 // ── login ──
@@ -1228,32 +1183,19 @@ function submitLogin(btn) {
   const orig = btn.textContent;
   btn.textContent = 'Entrando...'; btn.style.opacity = '.7'; btn.disabled = true;
 
-  (async () => {
-    // busca por email ou nome
+  setTimeout(() => {
+    const users = getUsers();
     let userEmail = identifier;
-    let user = _usersCache[identifier];
+    let user = users[identifier];
     if (!user) {
-      const found = Object.entries(_usersCache).find(([,u]) => u.nome?.toLowerCase() === identifier);
+      const found = Object.entries(users).find(([,u]) => u.nome?.toLowerCase() === identifier);
       if (found) { userEmail = found[0]; user = found[1]; }
-    }
-    // se não achou no cache, tenta no Supabase
-    if (!user && _supa) {
-      const { data } = await _supa.from('users').select('*').or(`email.eq.${identifier},nome.ilike.${identifier}`).single();
-      if (data) {
-        _usersCache[data.email] = { nome: data.nome, email: data.email, senha: data.senha, plan: data.plan, planExpiresAt: data.plan_expires_at ? new Date(data.plan_expires_at).getTime() : null, credits: data.credits, avatar: data.avatar_url, banned: data.banned, welcomeCouponUsed: data.welcome_coupon_used, createdAt: new Date(data.created_at).getTime() };
-        userEmail = data.email; user = _usersCache[data.email];
-      }
     }
 
     if (!user || user.senha !== senha) {
       btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
       [identEl, senhaEl].forEach(i => i.style.borderColor = 'rgba(248,113,113,.6)');
       showModalErr(overlay, 'Usuário ou senha incorretos.');
-      return;
-    }
-    if (user.banned) {
-      btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
-      showModalErr(overlay, 'Conta suspensa. Entre em contato com o suporte.');
       return;
     }
 
@@ -1266,7 +1208,7 @@ function submitLogin(btn) {
       clearModalErr(overlay);
       _loadSession();
     }, 700);
-  })();
+  }, 700);
 }
 
 // ── helpers de erro inline no modal ──
@@ -1284,19 +1226,21 @@ function clearModalErr(overlay) {
 function _loadSession() {
   const sess  = getSession();
   if (!sess) return;
-  const user  = _usersCache[sess.email];
+  const users = getUsers();
+  const user  = users[sess.email];
   if (!user) { clearSession(); return; }
 
   // verifica expiração do plano
   if (user.planExpiresAt && Date.now() > user.planExpiresAt && user.plan !== 'basico') {
     user.plan = 'basico';
     delete user.planExpiresAt;
-    _usersCache[sess.email] = user;
-    if (_supa) _supa.from('users').update({ plan: 'basico', plan_expires_at: null }).eq('email', sess.email).then(() => {});
+    users[sess.email] = user;
+    const allUsers = getUsers();
+    allUsers[sess.email] = user;
+    LS.set('ghost_users', allUsers);
   }
 
-  // carrega contadores do cache (já foram buscados no init)
-  queryCounters = getDailyCounters(sess.email, user.plan);
+  queryCounters = getDailyCounters(user.email, user.plan);
   currentUser = { name: user.nome, email: user.email, plan: user.plan };
   updateNavUser();
 }
@@ -1345,21 +1289,14 @@ function _doSaveProfile() {
   const newNome  = nomeEl?.value.trim();
   const newSenha = senhaEl?.value;
 
-  const u = _usersCache[currentUser.email];
+  const users = getUsers();
+  const u     = users[currentUser.email];
   if (!u) return;
 
   u.nome = newNome;
   if (newSenha) u.senha = newSenha;
-  _usersCache[currentUser.email] = u;
+  saveUsers(users);
   currentUser.name = newNome;
-
-  // persiste no Supabase
-  if (_supa) {
-    const payload = { nome: newNome };
-    if (newSenha) payload.senha = newSenha;
-    _supa.from('users').update(payload).eq('email', currentUser.email).then(() => {});
-  }
-
   updateNavUser();
 
   if (senhaEl) senhaEl.value = '';
@@ -3643,10 +3580,13 @@ document.querySelectorAll('.page').forEach(p => {
 })();
 try { history.replaceState({page:'home'}, '', location.href); } catch(_) {}
 showPage('home', false);
-_loadSession();
-if (!currentUser) initAnon();
-// banner de desconto pra visitantes
-setTimeout(function() { initDiscountBanner(); }, 500);
+
+document.addEventListener('DOMContentLoaded', function() {
+  _loadSession();
+  if (!currentUser) initAnon();
+  // banner de desconto pra visitantes
+  setTimeout(function() { initDiscountBanner(); }, 500);
+});
 
 // ── CONTADOR DE CONSULTAS EM TEMPO REAL ──
 (function(){
@@ -4153,7 +4093,6 @@ function sendChatMessage() {
   _chatMsgTimes.push(now);
   if (warnEl) { warnEl.textContent = ''; warnEl.style.display = 'none'; }
 
-  const userKey = currentUser?.anon ? (LS.get('ghost_anon_id') || 'anon') : (currentUser?.email || 'anon');
   const msg = { own: true, text, time: _chatFmtTime(new Date()) };
   _chatMessages.push(msg);
   _appendChatBubble(msg, true);
@@ -4163,10 +4102,8 @@ function sendChatMessage() {
   const counter = document.getElementById('chatInputCounter');
   if (counter) counter.textContent = '500';
 
-  // salva no Supabase
-  if (_supa) {
-    _supa.from('chats').insert({ user_key: userKey, role: 'user', message: text }).then(() => {});
-  }
+  // salva no localStorage
+  try { LS.set('ghost_chat_msgs', _chatMessages.slice(-50)); } catch(_) {}
 }
 
 function _showChatWarn(msg) {
@@ -4181,22 +4118,12 @@ function _showChatWarn(msg) {
 
 // carrega histórico do chat ao iniciar
 document.addEventListener('DOMContentLoaded', () => {
+  const saved = LS.get('ghost_chat_msgs');
+  if (Array.isArray(saved)) _chatMessages = saved;
   // hora de boas-vindas no chat
   const wel = document.getElementById('chatWelcomeTime');
   if (wel) wel.textContent = _chatFmtTime(new Date());
-
-  // carrega mensagens do Supabase quando abre o chat
 });
-
-// chamado por showPage quando entra na tela de chat
-async function _loadChatMessages() {
-  const userKey = currentUser?.anon ? (LS.get('ghost_anon_id') || 'anon') : (currentUser?.email || 'anon');
-  if (!_supa) return;
-  const { data } = await _supa.from('chats').select('*').eq('user_key', userKey).order('created_at', { ascending: true }).limit(100);
-  if (!data) return;
-  _chatMessages = data.map(m => ({ own: m.role === 'user', text: m.message, time: _chatFmtTime(new Date(m.created_at)) }));
-  _renderChatMessages();
-}
 
 
 // ════════════════════════════════════════════════════════════
@@ -4583,57 +4510,4 @@ function stopDiscountBanner() {
   } else {
     observeScrollFade();
   }
-})();
-
-// ════════════════════════════════════════════════════════════
-// ── INIT SUPABASE — carrega dados antes de tudo ──
-// ════════════════════════════════════════════════════════════
-(async function initSupabase() {
-  if (!_supa) {
-    console.warn('Supabase SDK não carregado. Verifique o <script> no HTML.');
-    // fallback: funciona sem backend (modo offline)
-    initAnon();
-    _loadSession();
-    return;
-  }
-
-  // 1. Carrega todos os usuários para o cache
-  await _fetchUsers();
-
-  // 2. Carrega sessão ativa
-  const sess = getSession();
-  if (sess?.email) {
-    const u = _usersCache[sess.email];
-    if (u) {
-      // carrega contadores do dia
-      const counters = await _fetchCounters(sess.email, u.plan);
-      const cacheKey = `${sess.email}_${u.plan}`;
-      _countersCache[cacheKey] = counters;
-      _loadSession();
-    } else {
-      clearSession();
-      initAnon();
-    }
-  } else {
-    // modo anônimo
-    const anonId = LS.get('ghost_anon_id') || ('anon_' + Math.random().toString(36).slice(2,10));
-    LS.set('ghost_anon_id', anonId);
-    const anonCounters = await _fetchCounters(anonId, 'basico');
-    _countersCache[`${anonId}_basico`] = anonCounters;
-    initAnon();
-  }
-
-  // 3. Escuta respostas do admin em tempo real (chat)
-  _supa.channel('chat-replies')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats', filter: 'role=eq.admin' }, payload => {
-      const userKey = currentUser?.anon ? (LS.get('ghost_anon_id') || 'anon') : (currentUser?.email || 'anon');
-      if (payload.new.user_key !== userKey) return;
-      const msg = { own: false, text: payload.new.message, time: _chatFmtTime(new Date(payload.new.created_at)) };
-      _chatMessages.push(msg);
-      // só renderiza se a página de chat estiver aberta
-      if (document.getElementById('page-chat')?.classList.contains('active')) {
-        _appendChatBubble(msg, true);
-      }
-    })
-    .subscribe();
 })();
