@@ -11,16 +11,24 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const SB_HEADERS    = { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON };
 
 async function sbGet(table, query='') {
-  // NÃO usa try/catch aqui: erros de rede lançam exceção e são capturados por quem chama
-  // Isso permite distinguir "usuário não existe" (null) de "erro de rede" (exception)
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: SB_HEADERS });
-  if (!r.ok) return null;
-  const d = await r.json();
-  return Array.isArray(d) ? d : null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: SB_HEADERS });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d : null;
+  } catch { return null; }
 }
 async function sbGetOne(table, query='') {
   const d = await sbGet(table, query + '&limit=1');
   return d?.[0] || null;
+}
+// versão que propaga erro de rede (não engole com try/catch)
+// usada no _loadSession pra distinguir "usuário não existe" de "rede falhou"
+async function sbGetOneRaw(table, query='') {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}&limit=1`, { headers: SB_HEADERS });
+  if (!r.ok) return null;
+  const d = await r.json();
+  return Array.isArray(d) ? d[0] || null : null;
 }
 async function sbPost(table, body) {
   try {
@@ -1370,15 +1378,15 @@ async function _loadSession() {
     updateNavUser();
   }
 
-  // 2. verifica o banco em background (não bloqueia o login)
+  // 2. verifica o banco em background
+  // sbGetOneRaw lança exceção em erro de rede, retorna null só se usuário não existe
   try {
-    const user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
+    const user = await sbGetOneRaw('users', `email=eq.${encodeURIComponent(sess.email)}`);
 
     if (!user) {
-      // só desloga se o banco confirmou que o usuário não existe E não tem cache local
-      // NUNCA desloga por timeout, rede lenta ou erro de rede
-      if (cached) return; // mantém cache sempre que existir
-      // sem cache e sem usuário no banco: sessão inválida
+      // banco respondeu confirmando que o usuário não existe — sessão inválida
+      // mas só desloga se não tem cache local (segurança extra)
+      if (cached) return;
       clearSession();
       currentUser = null;
       updateNavUser();
@@ -1410,9 +1418,8 @@ async function _loadSession() {
     updateNavUser();
 
   } catch {
-    // erro de rede — mantém o cache, não desloga
-    // se tinha cache, updateNavUser já foi chamado acima
-    if (!cached) updateNavUser(); // garante que a nav reflete o estado correto
+    // erro de rede — NÃO desloga, mantém o estado atual (cache ou anônimo)
+    // updateNavUser já foi chamado acima se tinha cache
   }
 }
 
