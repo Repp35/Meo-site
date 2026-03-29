@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+<title>Ghost Busca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="splash"></div>
+
+<!-- GHOST CURSOR -->
+<div id="ghost-cursor">
+  <svg width="22" height="26" viewBox="0 0 22 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2L2 20L7 15L10 22L13 21L10 14L17 14L2 2Z" fill="url(#cg)" stroke="rgba(255,255,255,.15)" stroke-width="1" stroke-linejoin="round"/>
+    <defs>
+      <linearGradient id="cg" x1="2" y1="2" x2="17" y2="22" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#f472b6"/>
+        <stop offset="100%" stop-color="#a855f7"/>
+      </linearGradient>
+    </defs>
+  </svg>
+</div>
+
+<div id="noise-overlay"></div>
+<div class="dot-grid"></div>
+<canvas id="room3d"></canvas>
+<div id="hero-light"></div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal-register">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-register')">✕</button>
+    <div class="modal-logo"><span>👻</span>Ghost<span class="modal-logo-dot">.</span>Busca</div>
+    <h2>Criar conta</h2>
+    <p class="modal-sub">Crie sua conta e comece a consultar agora.</p>
+    <div class="modal-field"><label class="modal-label">Nome</label><input class="modal-input" type="text" placeholder="Seu nome" autocomplete="name"></div>
+    <div class="modal-field"><label class="modal-label">E-mail ou usuário</label><input class="modal-input" id="reg-identifier" type="text" placeholder="seu@email.com ou nome" autocomplete="username"></div>
+    <div class="modal-field"><label class="modal-label">Senha</label>
+      <div class="modal-input-wrap">
+        <input class="modal-input" id="reg-pw" type="password" placeholder="Mínimo 5 caracteres" autocomplete="new-password">
+        <button class="modal-eye" onclick="togglePw('reg-pw','reg-eye')" id="reg-eye">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <button class="modal-submit" onclick="submitRegister(this)">Criar conta</button>
+    <div class="modal-hint" style="margin-top:12px;display:flex;align-items:flex-start;gap:8px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;color:var(--p)"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span><strong>Dica:</strong> não use a mesma senha que você usa em outros sites ou redes sociais.</span></div>
+    <div class="modal-footer">Já tem uma conta? <a onclick="switchModal('modal-register','modal-login')">Entrar</a></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">✕</button>
+    <div class="modal-logo"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7.03 2 3 6.03 3 11v9l3-2 2 2 2-2 2 2 2-2 3 2v-9c0-4.97-4.03-9-9-9zm-3.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" fill="currentColor"/></svg></span>Ghost<span class="modal-logo-dot">.</span>Busca</div>
+    <h2>Bem-vindo de volta</h2>
+    <p class="modal-sub">Entre com sua conta para continuar.</p>
+    <div class="modal-field"><label class="modal-label">E-mail ou nome de usuário</label><input class="modal-input" id="login-identifier" type="text" placeholder="seu@email.com ou nome" autocomplete="username"></div>
+    <div class="modal-field"><label class="modal-label">Senha</label>
+      <div class="modal-input-wrap">
+        <input class="modal-input" id="login-pw" type="password" placeholder="••••••••" autocomplete="current-password">
+        <button class="modal-eye" onclick="togglePw('login-pw','login-eye')" id="login-eye">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div style="text-align:right;margin-top:-8px;margin-bottom:16px"><a style="font-size:.72rem;color:var(--muted);cursor:pointer" onmouseover="this.style.color='var(--p3)'" onmouseout="this.style.color='var(--muted)'">Esqueci minha senha</a></div>
+    <button class="modal-submit" onclick="submitLogin(this)">Entrar</button>
+    <div class="modal-footer">Não tem uma conta? <a onclick="switchModal('modal-login','modal-register')">Criar conta</a></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav id="main-nav">
+  <div class="nav-inner">
+    <div class="nav-logo" onclick="goHome()">
+      <span class="nav-logo-ghost">👻</span>
+      <span>Ghost<span class="nav-logo-dot">.</span>Busca</span>
+    </div>
+    <div class="nav-r">
+      <span class="nav-pill">Beta</span>
+      <div id="nav-guest" style="display:flex;align-items:center;gap:8px">
+        <button class="btn-login" onclick="openModal('modal-login')">Login</button>
+        <button class="btn-register" onclick="openModal('modal-register')">Cadastro</button>
+      </div>
+      <div id="nav-user" style="display:none;align-items:center;gap:8px">
+        <div class="nav-avatar" onclick="goSettings()">
+          <div class="nav-av-circle" id="navAvCircle">R</div>
+          <span class="nav-av-name" id="navAvName">Usuário</span>
+        </div>
+      </div>
+      <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</nav>
+
+<div class="store-hero-bar" id="store-hero">
+  <span style="font-size:1rem;font-weight:700">Ghost<span style="color:var(--p3)">.</span><span class="store-logo-store">Store</span></span>
+  <button class="nav-menu-btn" id="storeMenuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+</div>
+
+<div id="menuBlurOverlay" class="menu-blur-overlay" onclick="closeMenu()"></div>
+
+<!-- DROPDOWN -->
+<div class="nav-dropdown" id="navDropdown">
+  <div class="nav-dropdown-inner">
+    <div class="nav-drop-items">
+      <div class="nav-drop-item" onclick="goStore();closeMenu()">
+        <div class="nav-drop-ico">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div class="nav-drop-name">Produtos Ghost</div>
+      </div>
+      <div class="nav-drop-item" onclick="goModules();closeMenu()">
+        <div class="nav-drop-ico">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        </div>
+        <div class="nav-drop-name">Consultas</div>
+      </div>
+      <div class="nav-drop-item" onclick="goHome();setTimeout(function(){var el=document.getElementById('plans');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},150);closeMenu()">
+        <div class="nav-drop-ico">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <div class="nav-drop-name">Ver planos</div>
+      </div>
+      <div class="nav-drop-item" id="menuCreditsItem" onclick="goWallet();closeMenu()">
+        <div class="nav-drop-ico">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="nav-drop-name">Créditos</div>
+      </div>
+      <div class="nav-drop-item" id="menuSettingsItem" onclick="goSettings();closeMenu()" style="display:none">
+        <div class="nav-drop-ico">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        <div style="flex:1">
+          <div class="nav-drop-name">Configurações</div>
+          <div id="menuPlanBadge" style="font-size:.62rem;color:var(--muted);margin-top:1px"></div>
+        </div>
+      </div>
+      <div class="nav-drop-item" id="menuHistoryItem" onclick="goHistory();closeMenu()" style="display:none">
+        <div class="nav-drop-ico">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="nav-drop-name">Histórico</div>
+      </div>
+      <div class="nav-drop-item" onclick="goChat();closeMenu()">
+        <div class="nav-drop-ico" style="color:var(--p)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="nav-drop-name">Atendimento</div>
+      </div>
+    </div>
+    <div class="nav-drop-divider"></div>
+    <div class="nav-drop-coupon">
+      <div class="nav-drop-coupon-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        Resgatar cupom
+      </div>
+      <div class="coupon-input-wrap">
+        <input class="coupon-input" id="couponInput" type="text" placeholder="Digite seu cupom" maxlength="20">
+        <button class="coupon-btn" onclick="redeemCoupon()">Resgatar</button>
+      </div>
+      <div class="coupon-msg" id="couponMsg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="ld" id="ld">
+  <div class="ld-ring"></div>
+  <div class="ld-steps">
+    <div class="ld-step" id="ls1"><span class="step-dot"></span><span id="ls1t">Iniciando...</span></div>
+    <div class="ld-step" id="ls2"><span class="step-dot"></span><span id="ls2t">Consultando...</span></div>
+    <div class="ld-step" id="ls3"><span class="step-dot"></span><span id="ls3t">Processando...</span></div>
+  </div>
+</div>
+
+<!-- PAGE: HOME -->
+<div class="page" id="page-home">
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-badge" id="heroBadge"><span class="hero-badge-dot"></span>Sem cadastro obrigatório</div>
+      <h1 class="hero-title"><span class="gt">Consulte dados</span><br><span style="color:var(--fg)">de qualquer pessoa</span></h1>
+      <p class="hero-sub">Aqui tem consulta de CPF, CNPJ,<br>telefone e muito mais!</p>
+      <div class="hero-cta">
+        <button class="btn-cta scroll-fade" id="btnConsult" onclick="handleConsult(event)">
+          Consultar agora
+        </button>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><span class="hero-stat-num" id="heroConsultas">+200k</span><span class="hero-stat-label">Consultas</span></div>
+        <div class="hero-stat"><span class="hero-stat-num">13+</span><span class="hero-stat-label">Módulos</span></div>
+        <div class="hero-stat"><span class="hero-stat-num" style="font-size:1.1rem">Gratuito</span><span class="hero-stat-label">Planos opcionais</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANS -->
+  <div id="plans">
+    <p class="plans-label">Preços</p>
+    <h2 class="plans-title">Planos <span class="gt">baratinhos</span></h2>
+    <p class="plans-sub">o mais acessível do mercado</p>
+    <div class="plans-carousel-wrap"><div class="plans-grid-new" id="plansGrid">
+      <!-- Básico -->
+      <div class="pc scroll-fade" style="--fd:.0s">
+        <div class="pc-tag t-free">Gratuito</div>
+        <div class="pc-name" style="color:#4ade80">Básico</div>
+        <div class="pc-price-free">R$0</div>
+        <div class="pc-period">para sempre</div>
+        <div class="pc-div"></div>
+        <div class="pc-features">
+          <div class="pc-feature"><span class="pc-check">·</span><span>Até <strong>80 consultas</strong> por dia</span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>CNPJ / CEP / IP <strong>ilimitados</strong></span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>Gerar Pessoa <strong>ilimitado</strong></span></div>
+          <div class="pc-feature"><span class="pc-check" style="color:var(--p3)">·</span><span style="color:var(--muted)">CPF Pro e Foto Nacional <strong style="color:var(--muted2)">disponíveis avulsos</strong></span></div>
+        </div>
+        <div class="pc-acquired">✓ Adquirido</div>
+        <button class="pc-btn" style="margin-top:10px" ontouchstart="togglePlanDetail('detail-basico',this,event)" onclick="togglePlanDetail('detail-basico',this,event)">Ver módulos</button>
+        <div class="pc-detail" id="detail-basico">
+          <div class="pd-mod-grid">
+            <div class="pm-item"><span class="pm-name">CPF</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CPF Pro</span><span class="pm-val" style="color:var(--p3);font-size:.62rem">avulso</span></div>
+            <div class="pm-item"><span class="pm-name">Nome</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Família</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Telefone</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">E-mail</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Placa</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CNH</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CNPJ</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CEP</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">IP</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">WHOIS</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Foto Nacional</span><span class="pm-val" style="color:var(--p3);font-size:.62rem">avulso</span></div>
+            <div class="pm-item"><span class="pm-name">Exportar</span><span class="pm-val no">—</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- Starter -->
+      <div class="pc scroll-fade" style="--fd:.1s">
+        <div class="pc-tag t-starter">Semanal</div>
+        <div class="pc-name">Starter</div>
+        <div class="pc-price-wrap">
+          <span class="pc-price-guest" id="starterPriceGuest">R$7,20</span>
+          <div class="pc-price" id="starterPriceMember">R$5,80</div>
+          <div class="pc-discount-tag" id="starterDiscTag">−19% cadastrando</div>
+        </div>
+        <div class="pc-period">por semana</div>
+        <div class="pc-div"></div>
+        <div class="pc-features">
+          <div class="pc-feature"><span class="pc-check">·</span><span>Até <strong>130 consultas</strong> por dia</span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>CPF Pro incluso</span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>Foto Nacional (<strong>3/dia</strong>)</span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>Histórico 7 dias</span></div>
+        </div>
+        <button class="pc-btn primary" onclick="buyPlan('starter',this)">Assinar</button>
+        <button class="pc-btn" style="margin-top:8px" ontouchstart="togglePlanDetail('detail-starter',this,event)" onclick="togglePlanDetail('detail-starter',this,event)">Ver módulos</button>
+        <div class="pc-detail" id="detail-starter">
+          <div class="pd-mod-grid">
+            <div class="pm-item"><span class="pm-name">CPF</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CPF Pro</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Nome</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Família</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Telefone</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">E-mail</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Placa</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CNH</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CNPJ</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CEP</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">IP</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">WHOIS</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Foto Nacional</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Exportar</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Histórico</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Lote</span><span class="pm-val no">—</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- Pro -->
+      <div class="pc feat scroll-fade" style="--fd:.2s">
+        <div class="pc-tag t-pro">Quinzenal</div>
+        <div class="pc-name">Pro</div>
+        <div class="pc-price-wrap">
+          <span class="pc-price-guest" id="proPriceGuest">R$11,00</span>
+          <div class="pc-price" id="proPriceMember">R$8,90</div>
+          <div class="pc-discount-tag">−19% cadastrando</div>
+        </div>
+        <div class="pc-period">por quinzena</div>
+        <div class="pc-div"></div>
+        <div class="pc-features">
+          <div class="pc-feature"><span class="pc-check">·</span><span>Até <strong>200 consultas</strong> por dia</span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>Foto do rosto inclusa</span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>Histórico <strong>30 dias</strong></span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>Exportar resultados</span></div>
+        </div>
+        <button class="pc-btn primary" onclick="buyPlan('pro',this)">Assinar agora</button>
+        <button class="pc-btn" style="margin-top:8px" ontouchstart="togglePlanDetail('detail-pro',this,event)" onclick="togglePlanDetail('detail-pro',this,event)">Ver módulos</button>
+        <div class="pc-detail" id="detail-pro">
+          <div class="pd-mod-grid">
+            <div class="pm-item"><span class="pm-name">CPF</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CPF Pro</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Nome</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Família</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Telefone</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">E-mail</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Placa</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CNH</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CNPJ</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CEP</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">IP</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">WHOIS</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Foto Nacional</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Exportar</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Histórico</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Lote</span><span class="pm-val lim">✓</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- Premium -->
+      <div class="pc feat2 scroll-fade" style="--fd:.3s">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div class="pc-tag t-premium" style="margin-bottom:0">Mensal</div><div class="pc-rec-badge-inline" style="background:linear-gradient(135deg,#c026d3,#f472b6)"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Recomendado</div></div>
+        <div class="pc-name">Premium</div>
+        <div class="pc-price-wrap">
+          <span class="pc-price-guest" id="premiumPriceGuest">R$17,50</span>
+          <div class="pc-price" id="premiumPriceMember">R$14,20</div>
+          <div class="pc-discount-tag">−19% cadastrando</div>
+        </div>
+        <div class="pc-period" style="color:rgba(148,163,184,.5)">por mês · cancele quando quiser</div>
+        <div class="pc-div"></div>
+        <div class="pc-features">
+          <div class="pc-feature"><span class="pc-check">·</span><span>Consultas <strong>ilimitadas</strong></span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span><strong>Todos</strong> os módulos</span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>Loja Ghost exclusiva</span></div>
+          <div class="pc-feature"><span class="pc-check">·</span><span>+5 dias <strong>bônus</strong></span></div>
+        </div>
+        <button class="pc-btn primary" onclick="buyPlan('premium',this)">Assinar agora</button>
+        <button class="pc-btn" style="margin-top:8px" ontouchstart="togglePlanDetail('detail-premium',this,event)" onclick="togglePlanDetail('detail-premium',this,event)">Ver módulos</button>
+        <div class="pc-detail" id="detail-premium">
+          <div class="pd-mod-grid">
+            <div class="pm-item"><span class="pm-name">CPF</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CPF Pro</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Nome</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Família</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Telefone</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">E-mail</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Placa</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CNH</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CNPJ</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">CEP</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">IP</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">WHOIS</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Foto Nacional</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Exportar</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Histórico</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Lote</span><span class="pm-val yes">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Sujar Nome</span><span class="pm-val lim">✓</span></div>
+            <div class="pm-item"><span class="pm-name">Loja Ghost</span><span class="pm-val lim">✓</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="plans-dots" id="plansDots"></div>
+    <div class="plans-drag-hint">Arraste para ver mais</div>
+  </div>
+
+  <!-- BANNER FLUTUANTE DESCONTO CADASTRO -->
+  <div class="discount-banner" id="discountBanner" onclick="openModal('modal-register')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>
+    <span>Cadastre-se grátis e pague <strong>19% menos</strong> em todos os planos</span>
+    <span class="discount-banner-cta">Criar conta →</span>
+  </div>
+
+  <!-- FAQ -->
+  <div id="faq">
+    <div class="faq-bar" onclick="toggleFaqPanel()">
+      <div class="faq-bar-left">
+        <svg class="faq-bar-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span class="faq-bar-label">Perguntas frequentes</span>
+      </div>
+      <span class="faq-chevron">▼</span>
+    </div>
+    <div class="faq-panel">
+      <div class="faq-scroll">
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-q">Preciso me cadastrar para usar?<span class="faq-icon">✕</span></div>
+          <div class="faq-a"><div class="faq-a-inner">Não. O plano Básico é totalmente gratuito e não exige nenhum cadastro. Basta acessar e consultar — até 80 consultas por dia.</div></div>
+        </div>
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-q">Meus dados ficam salvos em algum lugar?<span class="faq-icon">✕</span></div>
+          <div class="faq-a"><div class="faq-a-inner">Por padrão, não armazenamos nenhuma consulta feita por você. Os resultados são exibidos em tempo real e descartados assim que você sai da página. Opcionalmente, você pode ativar o <strong>Histórico</strong> nas configurações — nesse caso, suas consultas e transações ficam salvas <strong>localmente no seu dispositivo</strong> e nunca são enviadas para nossos servidores. Você pode desativar ou apagar o histórico a qualquer momento.</div></div>
+        </div>
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-q">Como funciona o pagamento dos planos?<span class="faq-icon">✕</span></div>
+          <div class="faq-a"><div class="faq-a-inner">Os pagamentos são processados de forma segura via Pix ou cartão. Você pode cancelar a qualquer momento, sem multa ou fidelidade.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-logo"><span>👻</span>Ghost<span style="color:var(--p3);letter-spacing:0">.</span>Busca</div>
+      <div class="footer-socials">
+        <a class="footer-icon" href="#" onclick="return false" title="Instagram">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".8" fill="currentColor" stroke="none"/></svg>
+        </a>
+        <a class="footer-icon" href="#" onclick="return false" title="Telegram">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        </a>
+      </div>
+      <div class="footer-right">
+        <span class="footer-copy">© 2026 Ghost. Todos os direitos reservados.</span>
+        <div class="footer-links">
+          <span class="footer-link" onclick="alert('Termos em breve.')">Termos de Uso</span>
+          <span class="footer-sep">·</span>
+          <span class="footer-link" onclick="alert('Privacidade em breve.')">Privacidade</span>
+          <span class="footer-sep">·</span>
+          <span class="footer-link" onclick="alert('suporte@ghostbusca.com')">Contato</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- PAGE: SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="settings-wrap">
+    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+    <div class="settings-title">Minha Conta</div>
+    <div id="settingsContent"></div>
+  </div>
+</div>
+
+<!-- PAGE: HISTORY -->
+<div class="page" id="page-history">
+  <div class="settings-wrap">
+    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+    <div class="settings-title">Histórico</div>
+    <div id="historyContent"></div>
+  </div>
+</div>
+
+<!-- PAGE: STORE -->
+<div class="page" id="page-store">
+  <div class="store-subheader" style="padding-top:74px">
+    <button class="btn-back" onclick="goHome();closeMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+    <div class="store-count" id="storeCount">carregando...</div>
+  </div>
+  <div class="store-search-row">
+    <input class="store-search" type="text" placeholder="Buscar produtos..." oninput="filterProducts(this.value)">
+    <div style="position:relative">
+      <button class="store-filter-btn" id="storeFilterBtn" onclick="toggleStoreFilters()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>Filtros
+      </button>
+      <div id="storeFilterDropdown" style="display:none"></div>
+    </div>
+  </div>
+  <div class="store-grid" id="storeGrid"></div>
+</div>
+
+<!-- PAGE: PRODUCT -->
+<div class="page" id="page-product"><div id="productDetail"></div></div>
+
+<!-- PAGE: MODULES -->
+<div class="page" id="page-modules">
+  <div style="width:100%;max-width:700px;padding:8px 0 0">
+    <button class="btn-back" id="modsBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+  </div>
+  <div class="page-head"><h2>Escolha um <span class="gt">módulo</span></h2><p>Selecione o tipo de consulta</p></div>
+
+  <!-- BALÃO DE CRÉDITOS (acima das consultas) -->
+  <div id="creditsBalloonWrap" style="display:none;justify-content:flex-end;width:100%;max-width:700px;margin-bottom:6px">
+    <div class="credits-balloon" id="creditsBalloon" onclick="goWallet()">
+      <svg width="9" height="11" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:inline-block;vertical-align:middle;opacity:.8"><defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"><animate attributeName="stop-color" values="#a855f7;#c026d3;#f472b6;#c026d3;#a855f7" dur="3s" repeatCount="indefinite"/></stop><stop offset="100%" stop-color="#f472b6"><animate attributeName="stop-color" values="#f472b6;#a855f7;#c026d3;#a855f7;#f472b6" dur="3s" repeatCount="indefinite"/></stop></linearGradient></defs><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="url(#sg)" stroke-width="3" stroke-linecap="square" fill="none"/></svg>
+      <span id="creditsBalloonVal">Créditos</span>
+    </div>
+  </div>
+
+  <!-- BALÃO DE CONSULTAS -->
+  <div class="queries-balloon" id="queriesBalloon" style="position:relative">
+    <div class="qb-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
+    <div class="qb-info">
+      <div class="qb-label">Consultas hoje</div>
+      <div class="qb-bar-wrap"><div class="qb-bar" id="qbBar" style="width:0%"></div></div>
+      <div class="qb-nums"><span id="qbLeft">— restantes</span></div>
+    </div>
+    <button class="qb-info-btn" id="qbInfoBtn" onclick="toggleQbTooltip(event)">?</button>
+  </div>
+  <div class="qb-tooltip" id="qbTooltip"></div>
+
+  <div id="modulesCreditsBanner"></div>
+  <div class="mods-grid">
+    <div class="mc" onclick="goQuery('cpf')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 10h2M16 14h2M6 10h4M6 14h2"/></svg></div><div class="mc-name">CPF</div><div class="mc-link">Consultar</div></div>
+    <div class="mc locked" id="cpfproCard"><div class="mc-lock-badge">Starter+</div><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="mc-name">CPF Pro</div><div class="mc-desc" style="font-size:.68rem;color:var(--muted);line-height:1.4;margin-bottom:8px;flex:1;font-weight:300">Consulta de CPF avançada</div><div class="mc-link" style="color:var(--muted)">Ver opções</div></div>
+    <div class="mc" onclick="goQuery('pix')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 512 512" fill="currentColor"><path d="M242.4 292.5C247.8 287.1 257.1 287.1 262.5 292.5L339.5 369.5C353.7 383.7 372.6 391.5 392.6 391.5H407.7L310.6 488.6C280.3 518.1 231.1 518.1 200.8 488.6L103.3 391.2H112.6C132.6 391.2 151.5 383.4 165.7 369.2L242.4 292.5zM262.5 218.9C256.1 224.4 247.9 224.5 242.4 218.9L165.7 142.2C151.5 127.1 132.6 120.2 112.6 120.2H103.3L200.7 22.76C231.1-7.586 280.3-7.586 310.6 22.76L407.8 119.9H392.6C372.6 119.9 353.7 127.7 339.5 141.9L262.5 218.9zM112.6 142.7C126.4 142.7 139.1 148.3 149.7 158.1L226.4 234.8C233.6 241.1 243 245.6 252.5 245.6C261.9 245.6 271.3 241.1 278.5 234.8L355.5 157.8C365.3 148.1 378.8 142.5 392.6 142.5H430.3L488.6 200.8C518.9 231.1 518.9 280.3 488.6 310.6L430.3 368.9H392.6C378.8 368.9 365.3 363.3 355.5 353.6L278.5 276.6C264.6 262.7 240.3 262.7 226.4 276.6L149.7 353.2C139.1 363 126.4 368.6 112.6 368.6H80.78L22.41 310.2C-7.918 279.9-7.918 230.7 22.41 200.4L80.78 142H112.6z"/></svg></div><div class="mc-name">Pix</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('nome')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div><div class="mc-name">Nome</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('cnpj')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V7l8-4 8 4v14M9 21v-4h6v4M9 10h.01M15 10h.01M9 14h.01M15 14h.01"/></svg></div><div class="mc-name">CNPJ</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('cep')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div><div class="mc-name">CEP</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('familiares')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="18" cy="8" r="2.5"/><path d="M22 21v-1.5a3 3 0 0 0-2-2.83"/></svg></div><div class="mc-name">Família</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('telefone')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.8 19.8 0 0 1 1.08 3.4 2 2 0 0 1 3.05 1.22h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.1a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 21 16.92z"/></svg></div><div class="mc-name">Telefone</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('email')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg></div><div class="mc-name">E-mail</div><div class="mc-link">Consultar</div></div>
+    <div class="mc mc-foto" onclick="goQuery('foto')"><div class="mc-hot-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="url(#fg)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px;filter:drop-shadow(0 0 3px rgba(255,120,0,.7))"><defs><linearGradient id="fg" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#ff2200"><animate attributeName="stop-color" values="#ff2200;#ff6600;#ffcc00;#ff6600;#ff2200" dur="1.8s" repeatCount="indefinite"/></stop><stop offset="50%" stop-color="#ff6600"><animate attributeName="stop-color" values="#ff6600;#ffcc00;#ff2200;#ffcc00;#ff6600" dur="1.8s" repeatCount="indefinite"/></stop><stop offset="100%" stop-color="#ffcc00"><animate attributeName="stop-color" values="#ffcc00;#ff2200;#ff6600;#ff2200;#ffcc00" dur="1.8s" repeatCount="indefinite"/></stop></linearGradient></defs><path d="M12 2c-1.5 4-4 6-4 10a6 6 0 0 0 12 0c0-3-1.5-5-3-7-1 2-1.5 4-2 5-.5-2-.5-5-3-8z"/></svg>Mais pedido</div><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div><div class="mc-name">Foto Nacional</div><div class="mc-desc-foto">Foto do rosto pelo nome</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('placa')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5"/><circle cx="16" cy="17" r="2.5"/><circle cx="6.5" cy="17" r="2.5"/><path d="M3 12h9M7 5h4"/></svg></div><div class="mc-name">Placa</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('cnh')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2.5"/><path d="M13 10h4M13 14h2"/></svg></div><div class="mc-name">CNH</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('ip')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10A15.3 15.3 0 0 1 8 12a15.3 15.3 0 0 1 4-10z"/></svg></div><div class="mc-name">IP</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('whois')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div><div class="mc-name">WHOIS</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('cns')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="mc-name">CNS</div><div class="mc-link">Consultar</div></div>
+    <div class="mc" onclick="goQuery('renavam')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a1 1 0 0 1-1-1v-4l2-5h12l2 5v4a1 1 0 0 1-1 1h-2"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/><path d="M5 9h14"/></svg></div><div class="mc-name">RENAVAM</div><div class="mc-link">Consultar</div></div>
+    <div class="mc soon"><div class="mc-soon-badge">Em breve</div><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg></div><div class="mc-name">Radar</div><div class="mc-desc">Geolocalização em tempo real</div><div class="mc-link">Em breve</div></div>
+    <div class="mc soon"><div class="mc-soon-badge">Em breve</div><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M4 20c0-3.5 2.5-6 5-6"/><path d="M15.5 12l1.2 2.8 2.8 1.2-2.8 1.2-1.2 2.8-1.2-2.8-2.8-1.2 2.8-1.2z"/></svg></div><div class="mc-name">Gerar Pessoa</div><div class="mc-desc">Cria identidade fictícia completa</div><div class="mc-link">Em breve</div></div>
+  </div>
+</div>
+
+<!-- PAGE: QUERY -->
+<div class="page" id="page-query">
+  <div style="width:100%;max-width:440px;padding:8px 0 0">
+    <button class="btn-back" id="qBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+  </div>
+  <div class="q-wrap">
+    <div class="q-ico" id="qIco"></div>
+    <div class="q-title" id="qTit"></div>
+    <div class="q-sub" id="qSub"></div>
+    <div id="qMiniBalloon" class="q-mini-balloon" style="display:none">
+      <div class="qmb-dot"></div>
+      <span id="qMiniBalloonTxt"></span>
+    </div>
+    <div id="fam-selector">
+      <button class="fam-opt active" onclick="setFamType('mae',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/><path d="M9 11.5C9.5 14 10.5 15 12 15s2.5-1 3-3.5"/></svg> Mãe</button>
+      <button class="fam-opt" onclick="setFamType('pai',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/><line x1="12" y1="11" x2="12" y2="15"/><line x1="10" y1="13" x2="14" y2="13"/></svg> Pai</button>
+    </div>
+    <div class="q-box">
+      <div class="iw">
+        <input type="text" id="qInp" autocomplete="off" oninput="autoFmt(this)">
+        <span class="iw-ico" id="qIcoSm" style="display:flex;align-items:center"></span>
+      </div>
+      <button class="btn-search" onclick="doSearch()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Consultar
+      </button>
+    </div>
+    <div id="qCreditsBanner" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- PAGE: UPGRADE -->
+<div class="page" id="page-upgrade">
+  <div style="width:100%;max-width:700px;padding:8px 0 0">
+    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar aos resultados</button>
+  </div>
+  <div class="upgrade-header">
+    <h2>Escolha um <span class="gt">plano</span></h2>
+    <p>Faça upgrade para desbloquear mais consultas</p>
+  </div>
+  <div class="plans-carousel-wrap" style="width:100%;max-width:700px">
+    <div class="plans-grid-new" id="plansGridUpgrade"></div>
+  </div>
+  <div class="plans-dots" id="plansDotsUpgrade" style="margin-top:12px"></div>
+  <div class="plans-drag-hint" style="margin-top:8px">Arraste para ver mais</div>
+</div>
+
+<!-- PAGE: WALLET -->
+<div class="page" id="page-wallet">
+  <div class="wallet-wrap">
+    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+    <div id="walletContent"></div>
+  </div>
+</div>
+
+<!-- PAGE: CREDITS INFO -->
+<div class="page" id="page-credits-info">
+  <div class="cinfo-wrap">
+    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+
+    <div class="cinfo-hero">
+      <div class="cinfo-s-wrap">
+        <div class="cinfo-s-ring">
+          <svg width="28" height="34" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sgHero" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"><animate attributeName="stop-color" values="#a855f7;#c026d3;#f472b6;#c026d3;#a855f7" dur="3s" repeatCount="indefinite"/></stop><stop offset="100%" stop-color="#f472b6"><animate attributeName="stop-color" values="#f472b6;#a855f7;#c026d3;#a855f7;#f472b6" dur="3s" repeatCount="indefinite"/></stop></linearGradient></defs><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="url(#sgHero)" stroke-width="2.5" stroke-linecap="square" fill="none"/></svg>
+        </div>
+      </div>
+      <div class="cinfo-hero-label">Créditos Ghost</div>
+      <h2>Consulte quando<br><span class="gt">quiser</span></h2>
+      <p>Sem assinatura, sem compromisso. Compre só o que precisar e use quando quiser.</p>
+    </div>
+
+    <div class="cinfo-cards">
+      <div class="cinfo-card" id="cinfo-c1">
+        <div class="cinfo-card-num">01</div>
+        <div class="cinfo-card-body">
+          <div class="cinfo-card-title">Nunca expiram</div>
+          <div class="cinfo-card-desc">Ficam na sua conta para sempre — sem prazo, sem pressão.</div>
+        </div>
+      </div>
+      <div class="cinfo-card" id="cinfo-c2">
+        <div class="cinfo-card-num">02</div>
+        <div class="cinfo-card-body">
+          <div class="cinfo-card-title">Sem plano obrigatório</div>
+          <div class="cinfo-card-desc">Pague só pelo que usar. Nada de mensalidade ou fidelidade.</div>
+        </div>
+      </div>
+      <div class="cinfo-card" id="cinfo-c3">
+        <div class="cinfo-card-num">03</div>
+        <div class="cinfo-card-body">
+          <div class="cinfo-card-title">Todos os módulos</div>
+          <div class="cinfo-card-desc">CPF, Foto, Placa, CNH, Família e mais — tudo disponível.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cinfo-price-row">
+      <span class="cinfo-price-from">A partir de</span>
+      <span class="cinfo-price-val">R$0,19 por consulta</span>
+    </div>
+
+    <button class="cinfo-buy-btn" id="cinfoBtn" onclick="goCredits(_creditsInfoMod)">
+      <svg width="10" height="12" viewBox="0 0 20 24" fill="none"><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="#fff" stroke-width="3" stroke-linecap="square"/></svg>
+      Comprar créditos
+    </button>
+  </div>
+</div>
+
+<!-- PAGE: CREDITS -->
+<div class="page" id="page-credits">
+  <div class="credits-wrap">
+    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+
+    <div style="text-align:center;margin-bottom:20px">
+      <div class="credits-mod-tag" id="creditsModTag" style="display:inline-flex;margin:0 auto 12px">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <span id="creditsModName">Créditos avulsos</span>
+      </div>
+      <div class="credits-title">Comprar créditos</div>
+      <p class="credits-sub" style="margin-bottom:0"><span id="creditsCostHint"></span></p>
+    </div>
+
+    <div class="credits-qty-wrap">
+      <div class="credits-qty-label">Quantas consultas você quer?</div>
+      <div class="credits-qty-row">
+        <button class="credits-qty-btn" onclick="changeCreditsQty(-1)">−</button>
+        <input type="number" class="credits-qty-num" id="creditsQtyNum" value="1" min="1" max="100" oninput="onCreditsQtyInput(this)" style="-webkit-user-select:text;user-select:text">
+        <button class="credits-qty-btn" onclick="changeCreditsQty(1)">+</button>
+      </div>
+      <div class="credits-presets" id="creditsPresets"></div>
+    </div>
+
+    <div class="credits-summary" id="creditsSummary"></div>
+
+    <button class="credits-buy-btn" id="creditsBuyBtn" onclick="buyCreditsNow()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      <span id="creditsBuyLabel">Comprar agora</span>
+    </button>
+
+    <div style="margin-top:14px;text-align:center">
+      <div id="creditsBalanceInfo" style="font-size:.78rem;color:var(--muted)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM USAR CRÉDITOS -->
+<div class="confirm-overlay" id="confirmUseCredits">
+  <div class="confirm-box" style="max-width:300px">
+    <h3 id="creditsConfirmTitle">Usar créditos?</h3>
+    <p id="creditsConfirmMsg">Esta consulta vai gastar créditos da sua carteira.</p>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="document.getElementById('confirmUseCredits').classList.remove('open')">Cancelar</button>
+      <button class="confirm-logout" style="background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.3);color:var(--p3)" onclick="document.getElementById('confirmUseCredits').classList.remove('open');_doSearchCreditsConfirmed()">Consultar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL UPGRADE/UNLOCK -->
+<div class="confirm-overlay" id="modalUnlock">
+  <div class="confirm-box" style="max-width:340px" id="modalUnlockBox">
+    <div id="modalUnlockContent"></div>
+  </div>
+</div>
+
+<!-- CSB CONFIRM FECHAR -->
+<div class="csb-confirm-overlay" id="csbConfirm">
+  <div class="csb-confirm-box">
+    <p>Deseja fechar este aviso?<br>Você ainda pode acessar créditos pelo menu ou pelo botão no topo.</p>
+    <div style="display:flex;gap:10px">
+      <button class="confirm-cancel" style="flex:1;padding:9px;border-radius:var(--r);font-size:.8rem;font-weight:600;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted2)" onclick="document.getElementById('csbConfirm').classList.remove('open')">Cancelar</button>
+      <button class="confirm-logout" style="flex:1;padding:9px;border-radius:var(--r);font-size:.8rem;font-weight:600;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);color:var(--p3)" onclick="dismissCreditsBanner()">Fechar</button>
+    </div>
+    <small>O aviso vai aparecer novamente em breve.</small>
+  </div>
+</div>
+
+
+<!-- CONFIRM APAGAR HISTÓRICO -->
+<div class="confirm-overlay" id="confirmClearHistory">
+  <div class="confirm-box">
+    <h3>Apagar histórico?</h3>
+    <p>Esta ação não pode ser desfeita.</p>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="document.getElementById('confirmClearHistory').classList.remove('open')">Cancelar</button>
+      <button class="confirm-logout" onclick="document.getElementById('confirmClearHistory').classList.remove('open');histClear();renderHistory()">Apagar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM LOGOUT -->
+<div class="confirm-overlay" id="confirmLogout">
+  <div class="confirm-box">
+    <h3>Sair da conta?</h3>
+    <p>Você precisará fazer login novamente para acessar seu plano e histórico.</p>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="document.getElementById('confirmLogout').classList.remove('open')">Cancelar</button>
+      <button class="confirm-logout" onclick="document.getElementById('confirmLogout').classList.remove('open');_doLogout()">Sair</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="confirmPwChange">
+  <div class="confirm-box">
+    <h3>Alterar senha?</h3>
+    <p>Tem certeza que deseja redefinir sua senha de acesso?</p>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="document.getElementById('confirmPwChange').classList.remove('open')">Cancelar</button>
+      <button class="confirm-logout" onclick="document.getElementById('confirmPwChange').classList.remove('open');_doSaveProfile()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: RESULTS -->
+<div class="page" id="page-results">
+  <div class="res-wrap">
+    <button class="btn-back res-back-btn" id="btnBk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+    <div id="resCon"></div>
+    <div id="resCreditsBanner" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- PAGE: CHAT DE SUPORTE -->
+<div class="page" id="page-chat">
+  <div class="chat-wrap">
+    <div class="chat-header">
+      <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+      <div class="chat-header-info">
+        <div class="chat-header-title">Atendimento Ghost</div>
+        <div class="chat-header-status" id="chatStatus"><span class="chat-status-dot" id="chatStatusDot"></span><span id="chatStatusTxt">Online</span></div>
+      </div>
+      
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-system-msg">
+        <div class="chat-system-ico">👻</div>
+        <div class="chat-system-text">
+          <strong>Ghost. Suporte</strong>
+          <p id="chatWelcomeMsg">Olá! Seja bem-vindo ao suporte Ghost. Envie sua mensagem e responderemos assim que pudermos.</p>
+          <span class="chat-system-time" id="chatWelcomeTime"></span>
+        </div>
+      </div>
+    </div>
+    <!-- Popover de perfil -->
+    <div class="chat-profile-popover" id="chatProfilePopover">
+      <div class="cpp-avatar" id="cppAvatar"></div>
+      <div class="cpp-name" id="cppName">Usuário</div>
+      <div class="cpp-plan" id="cppPlan"></div>
+      <div class="cpp-close" onclick="closeChatProfile()">✕</div>
+    </div>
+    <div class="chat-input-area">
+      <div class="chat-user-avatar" id="chatUserAvatar" onclick="openChatProfile()"></div>
+      <div class="chat-input-wrap">
+        <textarea class="chat-input" id="chatInput" placeholder="Digite sua mensagem..." rows="1" maxlength="500" oninput="autoResizeChatInput(this)" onkeydown="chatInputKeydown(event)"></textarea>
+        <div class="chat-input-counter" id="chatInputCounter">500</div>
+      </div>
+      <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div class="chat-rate-warn" id="chatRateWarn"></div>
+  </div>
+</div>
+
+<!-- PAGE: PÓS-COMPRA (Thank You) -->
+<div class="page" id="page-thankyou">
+  <div class="ty-wrap">
+    <canvas id="ty-canvas" class="ty-canvas"></canvas>
+    <div class="ty-content" id="tyContent">
+      <div class="ty-icon" id="tyIcon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <h2 class="ty-title" id="tyTitle">Compra realizada!</h2>
+      <p class="ty-sub" id="tySub">Seu acesso foi liberado com sucesso.</p>
+      <div class="ty-question" id="tyQuestion">
+        <p class="ty-q-text">Teve algum problema durante a compra?</p>
+        <div class="ty-btns">
+          <button class="ty-btn ty-btn-no" onclick="tyAnswerNo()">Não, tudo certo!</button>
+          <button class="ty-btn ty-btn-yes" onclick="tyAnswerYes()">Sim, preciso de ajuda</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- UPGRADE OVERLAY -->
+<div id="upgrade-overlay">
+  <canvas id="upg-canvas"></canvas>
+  <div class="upg-stage" id="upgStage">
+    <div class="upg-card" id="upgCardOld"></div>
+    <div class="upg-card" id="upgCardNew" style="opacity:0"></div>
+    <div class="upg-particles" id="upgParticles"></div>
+  </div>
+  <div class="upg-label" id="upgLabel"></div>
+</div>
+<!-- FILTER POPUP OVERLAY -->
+<div class="filter-overlay" id="filterOverlay" onclick="toggleStoreFilters()"></div>
+<div class="filter-popup" id="filterPopup">
+  <div class="filter-popup-header">
+    <span class="filter-popup-title">Filtrar produtos</span>
+    <button class="filter-popup-clearbtn" onclick="clearPriceFilter()">Limpar filtros</button>
+  </div>
+
+  <div class="filter-popup-body">
+    <div class="filter-section-label">PREÇO MÍNIMO</div>
+    <input class="filter-price-input" id="filterPriceMin" type="number" placeholder="R$ 0,00" min="0" step="0.01">
+
+    <div class="filter-section-label" style="margin-top:18px">PREÇO MÁXIMO</div>
+    <input class="filter-price-input" id="filterPriceMax" type="number" placeholder="Sem limite" min="0" step="0.01">
+
+    <div class="filter-section-label" style="margin-top:22px">ORDENAR POR</div>
+    <div class="filter-sort-row">
+      <button id="sort-newest"     class="filter-sort-chip active"   onclick="window._storeSort='newest';updateSortChips()">Recentes</button>
+      <button id="sort-price_asc"  class="filter-sort-chip"          onclick="window._storeSort='price_asc';updateSortChips()">Menor preço</button>
+      <button id="sort-price_desc" class="filter-sort-chip"          onclick="window._storeSort='price_desc';updateSortChips()">Maior preço</button>
+      <button id="sort-az"         class="filter-sort-chip"          onclick="window._storeSort='az';updateSortChips()">A→Z</button>
+      <button id="sort-za"         class="filter-sort-chip"          onclick="window._storeSort='za';updateSortChips()">Z→A</button>
+    </div>
+  </div>
+
+  <div class="filter-popup-footer">
+    <button class="filter-apply-btn" onclick="applyPriceFilter()">Aplicar filtros</button>
+    <button class="filter-cancel-btn" onclick="toggleStoreFilters()">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL CUPOM DE BOAS-VINDAS -->
+<div class="confirm-overlay" id="welcomeCouponModal">
+  <div class="confirm-box welcome-coupon-box">
+    <div class="wc-icon">🎟️</div>
+    <h3 class="wc-title">Cupom ativado!</h3>
+    <p class="wc-sub">Você ganhou desconto exclusivo de boas-vindas. Os preços já estão com o desconto aplicado para você.</p>
+    <div class="wc-discounts">
+      <div class="wc-row"><span class="wc-plan">Starter</span><span class="wc-disc">−27%</span><span class="wc-price">R$5,80<span class="wc-orig">/semana</span></span></div>
+      <div class="wc-row"><span class="wc-plan">Pro</span><span class="wc-disc">−25%</span><span class="wc-price">R$8,90<span class="wc-orig">/quinzena</span></span></div>
+      <div class="wc-row"><span class="wc-plan">Premium</span><span class="wc-disc">−25%</span><span class="wc-price">R$14,20<span class="wc-orig">/mês</span></span></div>
+    </div>
+    <button class="confirm-logout wc-btn" onclick="closeWelcomeCouponModal()">Aproveitar agora</button>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
