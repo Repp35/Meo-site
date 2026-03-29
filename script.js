@@ -1264,6 +1264,14 @@ async function submitRegister(btn) {
   }
 
   saveSession(email);
+
+  // salva cache imediatamente
+  const userCache = {
+    name: nome, email, plan: 'basico',
+    planExpiresAt: null, avatar_url: null, _credits: 0,
+  };
+  LS.set(`ghost_user_cache_${email}`, userCache);
+
   btn.textContent = '✓ Conta criada!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
   setTimeout(() => {
     closeModal('modal-register');
@@ -1316,6 +1324,18 @@ async function submitLogin(btn) {
   }
 
   saveSession(user.email);
+
+  // salva cache imediatamente pra garantir persistência mesmo se banco demorar
+  const userCache = {
+    name:       user.nome,
+    email:      user.email,
+    plan:       user.plan,
+    planExpiresAt: user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : null,
+    avatar_url: user.avatar_url || null,
+    _credits:   user.credits || 0,
+  };
+  LS.set(`ghost_user_cache_${user.email}`, userCache);
+
   btn.textContent = '✓ Bem-vindo!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
   setTimeout(async () => {
     closeModal('modal-login');
