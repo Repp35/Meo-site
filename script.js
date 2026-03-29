@@ -4056,11 +4056,27 @@ function goChat() {
 }
 
 // Abre o chat diretamente (usado pela tela de suporte e pelo tyAnswerYes)
-function _openChatPage() {
+async function _openChatPage() {
   pushNav('chat');
   showPage('chat');
   _renderChatUserAvatar();
   _setChatWelcomeTime();
+
+  // carrega histórico do banco se logado
+  if (currentUser && !currentUser.anon) {
+    const msgs = await sbGet('chats',
+      `user_key=eq.${encodeURIComponent(currentUser.email)}&order=created_at.asc`);
+    if (msgs && msgs.length > 0) {
+      _chatMessages = msgs.map(m => ({
+        own: m.role === 'user',
+        text: m.message,
+        time: _chatFmtTime(new Date(m.created_at)),
+        _id: m.id
+      }));
+      try { LS.set('ghost_chat_msgs', _chatMessages.slice(-50)); } catch(_) {}
+    }
+  }
+
   _renderChatMessages();
 }
 
