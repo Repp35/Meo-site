@@ -1340,55 +1340,56 @@ function clearModalErr(overlay) {
 // ── carrega sessão salva ao iniciar ──
 async function _loadSession() {
   const sess = getSession();
-  if (!sess) return;
+  if (!sess?.email) return;
 
-  // tenta buscar do banco com retry
-  let user = null;
-  for (let i = 0; i < 3; i++) {
-    user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
-    if (user !== null) break;
-    await new Promise(r => setTimeout(r, 800)); // aguarda 800ms antes de tentar de novo
+  // 1. loga imediatamente pelo cache local (sem esperar o banco)
+  const cached = LS.get(`ghost_user_cache_${sess.email}`);
+  if (cached) {
+    currentUser = cached;
+    queryCounters = LS.get(`ghost_daily_${cached.email}_${cached.plan}`)?.counters || {};
+    updateNavUser();
   }
 
-  // se falhou todas as tentativas, mantém sessão mas usa cache local
-  if (!user) {
-    const cached = LS.get(`ghost_user_cache_${sess.email}`);
-    if (cached) {
-      currentUser = cached;
-      queryCounters = await getDailyCounters(cached.email, cached.plan);
-      updateNavUser();
+  // 2. verifica o banco em background (não bloqueia o login)
+  try {
+    const user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
+
+    if (!user) {
+      // só desloga se o banco confirmou que o usuário não existe
+      // (não desloga por timeout ou erro de rede)
+      if (cached) return; // mantém cache se tiver
+      clearSession();
+      currentUser = null;
+      return;
     }
-    // NÃO limpa a sessão — pode ser falha de rede
-    return;
+
+    // verifica expiração do plano
+    if (user.plan_expires_at && Date.now() > new Date(user.plan_expires_at).getTime() && user.plan !== 'basico') {
+      await sbPatch('users', `email=eq.${encodeURIComponent(user.email)}`, { plan: 'basico', plan_expires_at: null });
+      user.plan = 'basico';
+      user.plan_expires_at = null;
+    }
+
+    queryCounters = await getDailyCounters(user.email, user.plan);
+    LS.set(`ghost_credits_${user.email}`, user.credits || 0);
+    if (user.avatar_url) LS.set(`ghost_avatar_${user.email}`, user.avatar_url);
+
+    currentUser = {
+      name:          user.nome,
+      email:         user.email,
+      plan:          user.plan,
+      planExpiresAt: user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : null,
+      avatar_url:    user.avatar_url || null,
+      _credits:      user.credits || 0,
+    };
+
+    // atualiza cache com dados frescos do banco
+    LS.set(`ghost_user_cache_${user.email}`, currentUser);
+    updateNavUser();
+
+  } catch {
+    // erro de rede — mantém o cache, não desloga
   }
-
-  // verifica expiração do plano
-  if (user.plan_expires_at && Date.now() > new Date(user.plan_expires_at).getTime() && user.plan !== 'basico') {
-    await sbPatch('users', `email=eq.${encodeURIComponent(user.email)}`, { plan: 'basico', plan_expires_at: null });
-    user.plan = 'basico';
-    user.plan_expires_at = null;
-  }
-
-  queryCounters = await getDailyCounters(user.email, user.plan);
-
-  // cache local dos créditos
-  LS.set(`ghost_credits_${user.email}`, user.credits || 0);
-  // cache local do avatar
-  if (user.avatar_url) LS.set(`ghost_avatar_${user.email}`, user.avatar_url);
-
-  currentUser = {
-    name:       user.nome,
-    email:      user.email,
-    plan:       user.plan,
-    planExpiresAt: user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : null,
-    avatar_url: user.avatar_url || null,
-    _credits:   user.credits || 0,
-  };
-
-  // salva cache local pra fallback
-  LS.set(`ghost_user_cache_${user.email}`, currentUser);
-
-  updateNavUser();
 }
 
 // ── logout ── (ver logoutUser() abaixo, que usa confirmação de modal)
