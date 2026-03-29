@@ -1093,7 +1093,8 @@ function showPage(id, pushHistory = true) {
   else { nav.classList.add('hidden'); closeMenu(); } // fecha menu ao sair da home
   if (storeHero) storeHero.style.display = id === 'store' ? 'flex' : 'none';
   if (id === 'modules') { updateBalloon(); updateCpfProCard(); updateCreditsBalloon(); updateModulesBanner(); }
-  if (id === 'chat')     { _renderChatUserAvatar(); _setChatWelcomeTime(); _renderChatMessages(); }
+  if (id === 'chat')     { _renderChatUserAvatar(); _setChatWelcomeTime(); _renderChatMessages(); _startChatPoll(); }
+  if (id !== 'chat')     { _stopChatPoll(); }
   if (id === 'thankyou')  { const q = document.getElementById('tyQuestion'); if(q) { q.style.opacity=''; q.style.transform=''; q.style.transition=''; } }
   if (pushHistory) {
     const state = {page: id, mod: curMod};
@@ -4022,6 +4023,31 @@ const CHAT_MAX_PER_MIN   = 10;     // máx 10 msgs por minuto
 let _chatLastSend   = 0;
 let _chatMsgTimes   = [];          // timestamps do último minuto
 let _chatMessages   = [];          // histórico da sessão
+let _chatPollInterval = null;
+
+function _startChatPoll() {
+  _stopChatPoll();
+  if (!currentUser || currentUser.anon) return;
+  _chatPollInterval = setInterval(async () => {
+    const msgs = await sbGet('chats',
+      `user_key=eq.${encodeURIComponent(currentUser.email)}&order=created_at.asc`);
+    if (!msgs) return;
+    msgs.filter(m => m.role === 'admin').forEach(m => {
+      const already = _chatMessages.find(x => x._id === m.id);
+      if (!already) {
+        const msg = { own: false, text: m.message, time: _chatFmtTime(new Date(m.created_at)), _id: m.id };
+        _chatMessages.push(msg);
+        _appendChatBubble(msg, true);
+        try { LS.set('ghost_chat_msgs', _chatMessages.slice(-50)); } catch(_) {}
+      }
+    });
+  }, 2000);
+}
+
+function _stopChatPoll() {
+  clearInterval(_chatPollInterval);
+  _chatPollInterval = null;
+}
 
 // Entrada pelo menu → mostra tela de suporte primeiro
 function goChat() {
