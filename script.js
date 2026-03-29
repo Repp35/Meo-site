@@ -4218,6 +4218,16 @@ function sendChatMessage() {
 
   // salva no localStorage
   try { LS.set('ghost_chat_msgs', _chatMessages.slice(-50)); } catch(_) {}
+
+  // envia pro Supabase
+  if (currentUser && !currentUser.anon) {
+    sbPost('chats', {
+      user_key: currentUser.email,
+      role: 'user',
+      message: text,
+      read_by_admin: false
+    });
+  }
 }
 
 function _showChatWarn(msg) {
