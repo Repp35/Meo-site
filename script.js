@@ -1471,6 +1471,7 @@ function switchModal(a,b){ closeModal(a); setTimeout(()=>openModal(b),110); }
 // Binding de fechar modal ao clicar fora — adiado para garantir que os elementos existem
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) closeAllModals(); }));
+  _loadSession();
 });
 
 // ── CTA ──
@@ -4053,12 +4054,22 @@ function goChat() {
   showThankYou('support', null);
 }
 
+// ── Avatar do admin (carregado uma vez ao abrir o chat) ──
+let _chatAdminAvatar = null;
+async function _loadChatAdminAvatar() {
+  try {
+    const rows = await sbGet('admins', 'select=avatar_url&limit=1');
+    _chatAdminAvatar = rows?.[0]?.avatar_url || null;
+  } catch { _chatAdminAvatar = null; }
+}
+
 // Abre o chat diretamente (usado pela tela de suporte e pelo tyAnswerYes)
 async function _openChatPage() {
   pushNav('chat');
   showPage('chat');
   _renderChatUserAvatar();
   _setChatWelcomeTime();
+  _loadChatAdminAvatar();
 
   // carrega histórico do banco se logado
   if (currentUser && !currentUser.anon) {
@@ -4190,8 +4201,12 @@ function _appendChatBubble(msg, animate = true) {
         ${avatarHtml}
       </div>`;
   } else {
-    // Mensagem do suporte (fantasma) — mesmo comportamento
-    const ghostHtml = showAvatar ? `<div class="chat-ghost-ico">👻</div>` : `<div class="chat-avatar-spacer"></div>`;
+    // Mensagem do suporte — mostra avatar do admin ou 👻 fallback
+    const ghostHtml = showAvatar
+      ? (_chatAdminAvatar
+          ? `<div class="chat-ghost-ico"><img src="${_chatAdminAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></div>`
+          : `<div class="chat-ghost-ico">👻</div>`)
+      : `<div class="chat-avatar-spacer"></div>`;
     row.innerHTML = `
       ${ghostHtml}
       <div class="chat-bubble ghost">${escStr(msg.text)}<span class="chat-bubble-time">${msg.time}</span></div>`;
