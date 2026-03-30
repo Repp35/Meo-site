@@ -60,7 +60,7 @@ async function sbUpsert(table, body, onConflict) {
 async function sbUploadAvatar(email, blob) {
   try {
     const ext  = blob.type === 'image/png' ? 'png' : 'jpg';
-    const path = `avatars/${email.replace(/[^a-z0-9]/gi,'_')}.${ext}`;
+    const path = `${email.replace(/[^a-z0-9]/gi,'_')}.${ext}`;
     // remove arquivo antigo primeiro (ignora erro)
     await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${path}`, {
       method: 'DELETE', headers: SB_HEADERS
