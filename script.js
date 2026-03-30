@@ -4067,7 +4067,7 @@ async function _openChatPage() {
   showPage('chat');
   _renderChatUserAvatar();
   _setChatWelcomeTime();
-  _loadChatAdminAvatar();
+  await _loadChatAdminAvatar();
 
   // carrega histórico do banco se logado
   if (currentUser && !currentUser.anon) {
