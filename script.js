@@ -3802,7 +3802,6 @@ document.querySelectorAll('.page').forEach(p => {
   const s = document.getElementById('splash');
   if(!s) return;
   const doFade = () => {
-    if (!document.getElementById('splash')) return;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         s.classList.add('fade');
@@ -3810,11 +3809,6 @@ document.querySelectorAll('.page').forEach(p => {
       });
     });
   };
-  // fallback nuclear: se o splash ainda existir depois de 3s, remove na força
-  setTimeout(() => {
-    const el = document.getElementById('splash');
-    if (el) { el.style.transition = 'opacity .3s ease'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }
-  }, 3000);
   // aguarda fontes carregarem antes de esconder o splash — evita flash de texto sem estilo
   if (document.fonts && document.fonts.ready) {
     Promise.race([
@@ -4621,16 +4615,20 @@ function showWelcomeCouponModal() {
   const sub     = document.getElementById('wcSub');
   const btn     = document.getElementById('wcBtn');
   const isGuest = !currentUser || currentUser.anon;
+
   if (title) title.textContent = isGuest ? 'Oferta de boas-vindas' : 'Cupom ativado!';
   if (sub)   sub.textContent   = isGuest
     ? 'Cadastre-se agora e pague menos. Desconto aplicado automaticamente ao criar sua conta.'
     : 'Você ganhou desconto exclusivo de boas-vindas. Os preços já estão com o desconto aplicado para você.';
   if (btn)   btn.textContent   = isGuest ? 'Criar conta grátis' : 'Aproveitar agora';
+
   if (el) el.classList.add('open');
 }
 function wcBtnAction() {
   closeWelcomeCouponModal();
-  if (!currentUser || currentUser.anon) setTimeout(() => openModal('modal-register'), 180);
+  if (!currentUser || currentUser.anon) {
+    setTimeout(() => openModal('modal-register'), 180);
+  }
 }
 function closeWelcomeCouponModal() {
   const el = document.getElementById('welcomeCouponModal');
@@ -4760,8 +4758,12 @@ function stopDiscountBanner() {
 
   // roda na inicialização e também quando a home é exibida
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', observeScrollFade);
+    document.addEventListener('DOMC. zqif(q4) {
+        
+    }else {
+        
+    }ontentLoaded', observeScrollFade);
   } else {
     observeScrollFade();
   }
-})();
+})();,s3wt 
