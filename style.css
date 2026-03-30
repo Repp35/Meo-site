@@ -1354,8 +1354,15 @@ html{height:-webkit-fill-available}
   max-width: 320px;
 }
 .wc-icon {
-  font-size: 2.2rem;
-  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(168,85,247,.1);
+  border: 1px solid rgba(168,85,247,.2);
+  margin: 0 auto 14px;
 }
 .wc-title {
   font-size: 1.1rem;
