@@ -4052,13 +4052,27 @@ function goChat() {
   showThankYou('support', null);
 }
 
-// ── Avatar do admin (carregado uma vez ao abrir o chat) ──
+// ── Avatar do admin (realtime) ──
 let _chatAdminAvatar = null;
+let _adminAvatarChannel = null;
 async function _loadChatAdminAvatar() {
   try {
     const rows = await sbGet('admins', 'select=avatar_url&limit=1');
     _chatAdminAvatar = rows?.[0]?.avatar_url || null;
   } catch { _chatAdminAvatar = null; }
+}
+function _subscribeAdminAvatar() {
+  if (_adminAvatarChannel) return;
+  const sb = window.supabase?.createClient
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON)
+    : null;
+  if (!sb) return;
+  _adminAvatarChannel = sb
+    .channel('admin-avatar')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'admins' }, payload => {
+      if (payload.new?.avatar_url) _chatAdminAvatar = payload.new.avatar_url;
+    })
+    .subscribe();
 }
 
 // Abre o chat diretamente (usado pela tela de suporte e pelo tyAnswerYes)
@@ -4068,6 +4082,7 @@ async function _openChatPage() {
   _renderChatUserAvatar();
   _setChatWelcomeTime();
   await _loadChatAdminAvatar();
+  _subscribeAdminAvatar();
 
   // carrega histórico do banco se logado
   if (currentUser && !currentUser.anon) {
@@ -4199,11 +4214,11 @@ function _appendChatBubble(msg, animate = true) {
         ${avatarHtml}
       </div>`;
   } else {
-    // Mensagem do suporte — mostra avatar do admin ou 👻 fallback
+    // Mensagem do suporte — mostra avatar do admin ou círculo neutro
     const ghostHtml = showAvatar
       ? (_chatAdminAvatar
           ? `<div class="chat-ghost-ico"><img src="${_chatAdminAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></div>`
-          : `<div class="chat-ghost-ico">👻</div>`)
+          : `<div class="chat-ghost-ico" style="background:var(--p2,#6366f1);display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:.7rem;font-weight:700;color:#fff">A</div>`)
       : `<div class="chat-avatar-spacer"></div>`;
     row.innerHTML = `
       ${ghostHtml}
