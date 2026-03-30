@@ -4557,8 +4557,25 @@ function onCreditsQtyInput(el) {
 
 // ── CUPOM DE BOAS-VINDAS ──
 function showWelcomeCouponModal() {
-  const el = document.getElementById('welcomeCouponModal');
+  const el      = document.getElementById('welcomeCouponModal');
+  const title   = document.getElementById('wcTitle');
+  const sub     = document.getElementById('wcSub');
+  const btn     = document.getElementById('wcBtn');
+  const isGuest = !currentUser || currentUser.anon;
+
+  if (title) title.textContent = isGuest ? 'Oferta de boas-vindas' : 'Cupom ativado!';
+  if (sub)   sub.textContent   = isGuest
+    ? 'Cadastre-se agora e pague menos. Desconto aplicado automaticamente ao criar sua conta.'
+    : 'Você ganhou desconto exclusivo de boas-vindas. Os preços já estão com o desconto aplicado para você.';
+  if (btn)   btn.textContent   = isGuest ? 'Criar conta grátis' : 'Aproveitar agora';
+
   if (el) el.classList.add('open');
+}
+function wcBtnAction() {
+  closeWelcomeCouponModal();
+  if (!currentUser || currentUser.anon) {
+    setTimeout(() => openModal('modal-register'), 180);
+  }
 }
 function closeWelcomeCouponModal() {
   const el = document.getElementById('welcomeCouponModal');
@@ -4688,8 +4705,12 @@ function stopDiscountBanner() {
 
   // roda na inicialização e também quando a home é exibida
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', observeScrollFade);
+    document.addEventListener('DOMC. zqif(q4) {
+        
+    }else {
+        
+    }ontentLoaded', observeScrollFade);
   } else {
     observeScrollFade();
   }
-})();
+})();,s3wt 
