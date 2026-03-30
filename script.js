@@ -4765,4 +4765,4 @@ function stopDiscountBanner() {
   } else {
     observeScrollFade();
   }
-})();,s3wt 
+})();
