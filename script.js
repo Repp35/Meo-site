@@ -22,14 +22,6 @@ async function sbGetOne(table, query='') {
   const d = await sbGet(table, query + '&limit=1');
   return d?.[0] || null;
 }
-// versão que propaga erro de rede (não engole com try/catch)
-// usada no _loadSession pra distinguir "usuário não existe" de "rede falhou"
-async function sbGetOneRaw(table, query='') {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}&limit=1`, { headers: SB_HEADERS });
-  if (!r.ok) return null;
-  const d = await r.json();
-  return Array.isArray(d) ? d[0] || null : null;
-}
 async function sbPost(table, body) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
@@ -91,44 +83,35 @@ let activeCoupon = null;
 // ── AUTH & CONTA — Supabase ──
 // ════════════════════════════════════════════
 
-// ── helpers de storage local (apenas para anônimos e cache leve) ──
+// ── helpers de storage local (apenas para preferências leves) ──
 const LS = {
   get:  k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set:  (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   del:  k => { try { localStorage.removeItem(k); } catch {} },
 };
 
-// ── sessão via localStorage (referência ao email logado) ──
+// ── sessão: email salvo em localStorage como referência ──
 function getSession()        { return LS.get('ghost_session'); }
-function saveSession(email)  { LS.set('ghost_session', { email, loggedAt: Date.now() }); }
+function saveSession(email)  { LS.set('ghost_session', { email }); }
 function clearSession()      { LS.del('ghost_session'); }
 
-// ── contadores diários — Supabase com fallback localStorage ──
+// ── contadores diários — 100% Supabase ──
 function todayStr() { return new Date().toISOString().slice(0,10); }
 
 async function getDailyCounters(email, plan) {
-  const p = plan || 'basico';
   try {
     const row = await sbGetOne('daily_counters',
-      `user_key=eq.${encodeURIComponent(email)}&plan=eq.${p}&date=eq.${todayStr()}`);
-    if (row) return row.counters || {};
-  } catch {}
-  // fallback: tenta localStorage
-  const key  = `ghost_daily_${email}_${p}`;
-  const data = LS.get(key);
-  if (data && data.date === todayStr()) return data.counters || {};
-  return {};
+      `user_key=eq.${encodeURIComponent(email)}&plan=eq.${plan || 'basico'}&date=eq.${todayStr()}`);
+    return row?.counters || {};
+  } catch { return {}; }
 }
 
 async function saveDailyCounters(email, counters, plan) {
-  const p = plan || currentUser?.plan || 'basico';
   try {
     await sbUpsert('daily_counters',
-      { user_key: email, plan: p, date: todayStr(), counters },
+      { user_key: email, plan: plan || currentUser?.plan || 'basico', date: todayStr(), counters },
       'user_key,plan,date');
   } catch {}
-  // espelho em localStorage
-  LS.set(`ghost_daily_${email}_${p}`, { date: todayStr(), counters });
 }
 
 // ════════════════════════════════════════
@@ -140,15 +123,10 @@ function getOrCreateAnonId() {
   return id;
 }
 function initAnon() {
-  const anonId = getOrCreateAnonId();
-  const cached = LS.get(`ghost_daily_${anonId}_basico`);
-  queryCounters = (cached && cached.date === todayStr()) ? (cached.counters || {}) : {};
-  currentUser = { name: 'Visitante', email: anonId, plan: 'basico', anon: true };
+  queryCounters = {};
+  currentUser = { name: 'Visitante', email: getOrCreateAnonId(), plan: 'basico', anon: true };
 }
-// override: persistir contador p/ anônimo também
-function _persistCountersAnon() {
-  if (currentUser) LS.set(`ghost_daily_${currentUser.email}_basico`, { date: todayStr(), counters: queryCounters });
-}
+function _persistCountersAnon() {}
 
 // ════════════════════════════════════════
 // ── BALÃO DE CONSULTAS ──
@@ -405,16 +383,13 @@ const CREDIT_DISCOUNTS = [
 
 function getCredits(email) {
   if (!email) return 0;
-  // usa cache em memória se disponível (atualizado ao fazer login)
   if (currentUser && currentUser.email === email && typeof currentUser._credits === 'number') return currentUser._credits;
-  return LS.get(`ghost_credits_${email}`) || 0;
+  return 0;
 }
 function setCredits(email, val) {
   if (!email) return;
   const v = Math.max(0, Math.round(val * 100) / 100);
-  LS.set(`ghost_credits_${email}`, v);
   if (currentUser && currentUser.email === email) currentUser._credits = v;
-  // persiste no banco de forma assíncrona
   sbPatch('users', `email=eq.${encodeURIComponent(email)}`, { credits: v }).catch(()=>{});
 }
 function addCredits(email, val) {
@@ -435,9 +410,8 @@ function getDiscount(brl) {
 // ── CARTEIRA DIGITAL ──
 function getUserAvatar(email) {
   if (!email) return null;
-  // avatar_url vem do banco ao fazer login, guardado em currentUser
   if (currentUser && currentUser.email === email && currentUser.avatar_url) return currentUser.avatar_url;
-  return LS.get(`ghost_avatar_${email}`) || null;
+  return null;
 }
 async function setUserAvatar(email, base64OrBlob) {
   let url = null;
@@ -452,10 +426,9 @@ async function setUserAvatar(email, base64OrBlob) {
   if (url) {
     await sbPatch('users', `email=eq.${encodeURIComponent(email)}`, { avatar_url: url });
     if (currentUser && currentUser.email === email) currentUser.avatar_url = url;
-    LS.set(`ghost_avatar_${email}`, url);
+    // avatar salvo no banco via sbPatch acima
   } else {
-    // fallback: guarda base64 só em localStorage
-    LS.set(`ghost_avatar_${email}`, base64OrBlob);
+    // sem URL do storage, avatar não salvo
   }
 }
 
@@ -629,7 +602,7 @@ function removeAvatar() {
     const avatarEl = document.querySelector('.settings-avatar');
     if (avatarEl) { avatarEl.classList.remove('avatar-swapping'); void avatarEl.offsetWidth; avatarEl.classList.add('avatar-swapping'); }
     setTimeout(async () => {
-      LS.set(`ghost_avatar_${currentUser.email}`, null);
+      if (currentUser) currentUser.avatar_url = null;
       if (currentUser) currentUser.avatar_url = null;
       await sbPatch('users', `email=eq.${encodeURIComponent(currentUser.email)}`, { avatar_url: null });
       updateNavUser(); renderSettings();
@@ -1273,13 +1246,6 @@ async function submitRegister(btn) {
 
   saveSession(email);
 
-  // salva cache imediatamente
-  const userCache = {
-    name: nome, email, plan: 'basico',
-    planExpiresAt: null, avatar_url: null, _credits: 0,
-  };
-  LS.set(`ghost_user_cache_${email}`, userCache);
-
   btn.textContent = '✓ Conta criada!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
   setTimeout(() => {
     closeModal('modal-register');
@@ -1333,17 +1299,6 @@ async function submitLogin(btn) {
 
   saveSession(user.email);
 
-  // salva cache imediatamente pra garantir persistência mesmo se banco demorar
-  const userCache = {
-    name:       user.nome,
-    email:      user.email,
-    plan:       user.plan,
-    planExpiresAt: user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : null,
-    avatar_url: user.avatar_url || null,
-    _credits:   user.credits || 0,
-  };
-  LS.set(`ghost_user_cache_${user.email}`, userCache);
-
   btn.textContent = '✓ Bem-vindo!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
   setTimeout(async () => {
     closeModal('modal-login');
@@ -1368,27 +1323,19 @@ function clearModalErr(overlay) {
 // ── carrega sessão salva ao iniciar ──
 async function _loadSession() {
   const sess = getSession();
-  if (!sess?.email) return;
+  if (!sess?.email) { return; }
 
-  // 1. loga imediatamente pelo cache local (sem esperar o banco)
-  const cached = LS.get(`ghost_user_cache_${sess.email}`);
-  if (cached) {
-    currentUser = cached;
-    queryCounters = LS.get(`ghost_daily_${cached.email}_${cached.plan}`)?.counters || {};
-    updateNavUser();
-  }
+  // visitante até o banco responder
+  initAnon();
+  updateNavUser();
 
-  // 2. verifica o banco em background
-  // sbGetOneRaw lança exceção em erro de rede, retorna null só se usuário não existe
   try {
-    const user = await sbGetOneRaw('users', `email=eq.${encodeURIComponent(sess.email)}`);
+    const user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
 
     if (!user) {
-      // banco respondeu confirmando que o usuário não existe — sessão inválida
-      // mas só desloga se não tem cache local (segurança extra)
-      if (cached) return;
+      // usuário não existe mais no banco — limpa sessão, fica como visitante
       clearSession();
-      currentUser = null;
+      initAnon();
       updateNavUser();
       return;
     }
@@ -1401,8 +1348,6 @@ async function _loadSession() {
     }
 
     queryCounters = await getDailyCounters(user.email, user.plan);
-    LS.set(`ghost_credits_${user.email}`, user.credits || 0);
-    if (user.avatar_url) LS.set(`ghost_avatar_${user.email}`, user.avatar_url);
 
     currentUser = {
       name:          user.nome,
@@ -1413,15 +1358,15 @@ async function _loadSession() {
       _credits:      user.credits || 0,
     };
 
-    // atualiza cache com dados frescos do banco
-    LS.set(`ghost_user_cache_${user.email}`, currentUser);
     updateNavUser();
 
   } catch {
-    // erro de rede — NÃO desloga, mantém o estado atual (cache ou anônimo)
-    // updateNavUser já foi chamado acima se tinha cache
+    // erro de rede — fica como visitante, sessão permanece salva pra próxima tentativa
+    initAnon();
+    updateNavUser();
   }
 }
+
 
 // ── logout ── (ver logoutUser() abaixo, que usa confirmação de modal)
 
