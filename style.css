@@ -1440,4 +1440,4 @@ html{height:-webkit-fill-available}
   transform: translateY(0);
 }
 /* respeita delay individual via style="--fd:Xs" */
-.scroll-fade { transition-delay: var(--fd, 0s); }
+.scroll-fade { transition-delay: var(--fd, 0s); } 
