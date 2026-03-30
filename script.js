@@ -4760,12 +4760,8 @@ function stopDiscountBanner() {
 
   // roda na inicialização e também quando a home é exibida
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMC. zqif(q4) {
-        
-    }else {
-        
-    }ontentLoaded', observeScrollFade);
+    document.addEventListener('DOMContentLoaded', observeScrollFade);
   } else {
     observeScrollFade();
   }
-})();,s3wt 
+})();
