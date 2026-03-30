@@ -3802,28 +3802,6 @@ document.querySelectorAll('.page').forEach(p => {
   syncReal();
   tick();
 })();
-(function(){
-  const s = document.getElementById('splash');
-  if(!s) return;
-  const doFade = () => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        s.classList.add('fade');
-        setTimeout(() => s.remove(), 450);
-      });
-    });
-  };
-  // aguarda fontes carregarem antes de esconder o splash — evita flash de texto sem estilo
-  if (document.fonts && document.fonts.ready) {
-    Promise.race([
-      document.fonts.ready,
-      new Promise(res => setTimeout(res, 1800)) // timeout máximo de 1.8s
-    ]).then(doFade);
-  } else {
-    doFade();
-  }
-})();
-
 // ── CARROSSEL DE PLANOS ──
 (function(){
   const wrap = document.querySelector('.plans-carousel-wrap');
@@ -4762,12 +4740,8 @@ function stopDiscountBanner() {
 
   // roda na inicialização e também quando a home é exibida
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMC. zqif(q4) {
-        
-    }else {
-        
-    }ontentLoaded', observeScrollFade);
+    document.addEventListener('DOMContentLoaded', observeScrollFade);
   } else {
     observeScrollFade();
   }
-})();,s3wt 
+})();
