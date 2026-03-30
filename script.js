@@ -1065,6 +1065,7 @@ function setFamType(type, btn) {
 function showPage(id, pushHistory = true) {
   document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.animation=''; });
   const el = document.getElementById('page-'+id);
+  if (!el) return;
   el.classList.add('active');
   el.style.animation = 'pageIn .22s ease both';
   window.scrollTo(0, 0);
@@ -3746,8 +3747,11 @@ document.querySelectorAll('.page').forEach(p => {
 
 // ── INICIALIZAÇÃO PRINCIPAL ──
 (async function() {
-  try { history.replaceState({page:'home'}, '', location.href); } catch(_) {}
-  showPage('home', false);
+  const hash = location.hash.replace('#', '') || 'home';
+  const validPages = ['home','modules','query','results','settings','history','store','product','wallet','credits-info','credits','chat','thankyou','upgrade'];
+  const startPage = validPages.includes(hash) ? hash : 'home';
+  try { history.replaceState({page: startPage}, '', location.href); } catch(_) {}
+  showPage(startPage, false);
   await _loadSession();
   if (!currentUser) initAnon();
   setTimeout(function() { initDiscountBanner(); }, 500);
@@ -3798,6 +3802,28 @@ document.querySelectorAll('.page').forEach(p => {
   syncReal();
   tick();
 })();
+(function(){
+  const s = document.getElementById('splash');
+  if(!s) return;
+  const doFade = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        s.classList.add('fade');
+        setTimeout(() => s.remove(), 450);
+      });
+    });
+  };
+  // aguarda fontes carregarem antes de esconder o splash — evita flash de texto sem estilo
+  if (document.fonts && document.fonts.ready) {
+    Promise.race([
+      document.fonts.ready,
+      new Promise(res => setTimeout(res, 1800)) // timeout máximo de 1.8s
+    ]).then(doFade);
+  } else {
+    doFade();
+  }
+})();
+
 // ── CARROSSEL DE PLANOS ──
 (function(){
   const wrap = document.querySelector('.plans-carousel-wrap');
