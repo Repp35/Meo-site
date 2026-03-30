@@ -579,8 +579,7 @@ input::placeholder{color:rgba(148,163,184,.25)}
 .mc:hover .mc-ico{transform:translateZ(8px) scale(1.05)}
 
 /* ── SPLASH ── */
-#splash{position:fixed;inset:0;z-index:9999;background:#0b0b14;pointer-events:none;opacity:1;transition:opacity .4s cubic-bezier(.4,0,.2,1)}
-#splash.fade{opacity:0}
+
 
 /* ── RESPONSIVE ── */
 @media(min-width:900px){
@@ -1354,15 +1353,8 @@ html{height:-webkit-fill-available}
   max-width: 320px;
 }
 .wc-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(168,85,247,.1);
-  border: 1px solid rgba(168,85,247,.2);
-  margin: 0 auto 14px;
+  font-size: 2.2rem;
+  margin-bottom: 10px;
 }
 .wc-title {
   font-size: 1.1rem;
