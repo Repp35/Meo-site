@@ -2428,6 +2428,8 @@ function _doLogout() {
   currentUser = null;
   queryCounters = {};
   activeCoupon = null;
+  const wcModal = document.getElementById('welcomeCouponModal');
+  if (wcModal) wcModal.classList.remove('open');
   updateNavUser();
   goHome();
 }
@@ -2441,9 +2443,33 @@ function updateNavUser() {
   const planBadge = document.getElementById('menuPlanBadge');
   const heroBadge = document.getElementById('heroBadge');
 
+  function _fadeSwapNav(hideEl, showEl) {
+    hideEl.style.transition = 'opacity .2s ease';
+    hideEl.style.opacity = '0';
+    setTimeout(() => {
+      hideEl.style.display = 'none';
+      showEl.style.opacity = '0';
+      showEl.style.display = 'flex';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        showEl.style.transition = 'opacity .25s ease';
+        showEl.style.opacity = '1';
+      }));
+    }, 180);
+  }
+
+  function _fadeSwapBadge(el, newHTML) {
+    el.style.transition = 'opacity .18s ease, transform .18s ease';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-4px)';
+    setTimeout(() => {
+      el.innerHTML = newHTML;
+      el.style.transition = 'opacity .22s ease, transform .22s ease';
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    }, 180);
+  }
+
   if (currentUser && !currentUser.anon) {
-    guest.style.display = 'none';
-    user.style.display  = 'flex';
     stopDiscountBanner();
     const avatar = getUserAvatar(currentUser.email);
     if (avatar) {
@@ -2451,23 +2477,50 @@ function updateNavUser() {
     } else {
       circle.textContent = currentUser.name[0].toUpperCase();
     }
-    nameEl.textContent  = currentUser.name;
+    nameEl.textContent = currentUser.name;
+
+    const guestVisible = guest.style.display !== 'none';
+    if (guestVisible) {
+      _fadeSwapNav(guest, user);
+    } else if (user.style.display === 'none') {
+      user.style.display = 'flex';
+    }
+
     if (setItem) setItem.style.display = 'flex';
     const histItem = document.getElementById('menuHistoryItem');
     if (histItem) histItem.style.display = 'flex';
     if (planBadge) planBadge.textContent = '';
+
     if (heroBadge) {
       const plan  = currentUser.plan || 'basico';
       const label = PLAN_LIMITS[plan]?.label || 'Básico';
-      heroBadge.innerHTML = `<span class="hero-badge-dot"></span>Plano ${label} ativo`;
+      const newHTML = `<span class="hero-badge-dot"></span>Plano ${label} ativo`;
+      if (heroBadge.textContent.includes('Sem cadastro')) {
+        _fadeSwapBadge(heroBadge, newHTML);
+      } else {
+        heroBadge.innerHTML = newHTML;
+      }
       heroBadge.classList.remove('hidden');
     }
   } else {
-    guest.style.display = 'flex';
-    user.style.display  = 'none';
+    const userVisible = user.style.display === 'flex';
+    if (userVisible) {
+      _fadeSwapNav(user, guest);
+    } else if (guest.style.display === 'none') {
+      guest.style.display = 'flex';
+    }
+
     if (setItem) setItem.style.display = 'none';
+    const histItem = document.getElementById('menuHistoryItem');
+    if (histItem) histItem.style.display = 'none';
+
     if (heroBadge) {
-      heroBadge.innerHTML = '<span class="hero-badge-dot"></span>Sem cadastro obrigatório';
+      const newHTML = '<span class="hero-badge-dot"></span>Sem cadastro obrigatório';
+      if (!heroBadge.textContent.includes('Sem cadastro')) {
+        _fadeSwapBadge(heroBadge, newHTML);
+      } else {
+        heroBadge.innerHTML = newHTML;
+      }
       heroBadge.classList.remove('hidden');
     }
   }
