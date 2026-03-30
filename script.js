@@ -1325,9 +1325,7 @@ async function _loadSession() {
   const sess = getSession();
   if (!sess?.email) { return; }
 
-  // visitante até o banco responder
-  initAnon();
-  updateNavUser();
+  // aguarda o banco sem mostrar como visitante (evita flicker)
 
   try {
     const user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
