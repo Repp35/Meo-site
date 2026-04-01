@@ -970,7 +970,7 @@ function switchModal(a,b){ closeModal(a); setTimeout(()=>openModal(b),110); }
 // Binding de fechar modal ao clicar fora
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) closeAllModals(); }));
-  // _loadSession já é chamado no DOMContentLoaded acima — não chamar duas vezes
+  _loadSession();
 });
 
 // ── CTA ──
