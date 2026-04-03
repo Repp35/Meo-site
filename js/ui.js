@@ -378,6 +378,7 @@ let _chatMsgTimes   = [];
 let _chatMessages   = [];
 let _chatPollInterval = null;
 let _chatAdminAvatar = null;
+let _chatAdminName = null;
 let _adminAvatarChannel = null;
 
 function _startChatPoll() {
@@ -388,7 +389,7 @@ function _startChatPoll() {
     if(!msgs)return;
     msgs.filter(m=>m.role==='admin').forEach(m=>{
       const already=_chatMessages.find(x=>x._id===m.id);
-      if(!already){const msg={own:false,text:m.message,time:_chatFmtTime(new Date(m.created_at)),_id:m.id};_chatMessages.push(msg);_appendChatBubble(msg,true);try{LS.set('ghost_chat_msgs',_chatMessages.slice(-50));}catch(_){}}
+      if(!already){const msg={own:false,text:m.message,time:_chatFmtTime(new Date(m.created_at)),_id:m.id,admin_name:m.admin_name||null};_chatMessages.push(msg);_appendChatBubble(msg,true);try{LS.set('ghost_chat_msgs',_chatMessages.slice(-50));}catch(_){}}
     });
   },2000);
 }
@@ -401,7 +402,7 @@ function goChat() {
 }
 
 async function _loadChatAdminAvatar() {
-  try{const rows=await sbGet('admins','select=avatar_url&limit=1');_chatAdminAvatar=rows?.[0]?.avatar_url||null;}catch{_chatAdminAvatar=null;}
+  try{const rows=await sbGet('admins','select=avatar_url,display_name&limit=1');_chatAdminAvatar=rows?.[0]?.avatar_url||null;_chatAdminName=rows?.[0]?.display_name||null;}catch{_chatAdminAvatar=null;_chatAdminName=null;}
 }
 function _subscribeAdminAvatar() {
   if(_adminAvatarChannel)return;
@@ -416,8 +417,9 @@ async function _openChatPage() {
   await _loadChatAdminAvatar();_subscribeAdminAvatar();
   if(currentUser&&!currentUser.anon){
     const msgs=await sbGet('chats',`user_key=eq.${encodeURIComponent(currentUser.email)}&order=created_at.asc`);
-    if(msgs&&msgs.length>0){_chatMessages=msgs.map(m=>({own:m.role==='user',text:m.message,time:_chatFmtTime(new Date(m.created_at)),_id:m.id}));try{LS.set('ghost_chat_msgs',_chatMessages.slice(-50));}catch(_){}  _renderChatMessages();}
+    if(msgs&&msgs.length>0){_chatMessages=msgs.map(m=>({own:m.role==='user',text:m.message,time:_chatFmtTime(new Date(m.created_at)),_id:m.id,admin_name:m.admin_name||null}));try{LS.set('ghost_chat_msgs',_chatMessages.slice(-50));}catch(_){}  _renderChatMessages();}
   }
+  _startChatPoll();
 }
 
 function _setChatWelcomeTime() { const el=document.getElementById('chatWelcomeTime');if(el)el.textContent=_chatFmtTime(new Date()); }
@@ -444,31 +446,52 @@ function openChatProfile() {
 }
 function closeChatProfile(){document.getElementById('chatProfilePopover')?.classList.remove('open');document.removeEventListener('click',_closeChatProfileOutside);}
 function _closeChatProfileOutside(e){const pop=document.getElementById('chatProfilePopover');if(pop&&!pop.contains(e.target)&&e.target.id!=='chatUserAvatar')closeChatProfile();}
+
+function openAdminInspect(){
+  const pop=document.getElementById('adminInspectPopover');if(!pop)return;
+  const name=_chatAdminName||'Admin';
+  const av=document.getElementById('aipAvatar');
+  if(av)av.innerHTML=_chatAdminAvatar?`<img src="${_chatAdminAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:`<span style="font-size:1.1rem;font-weight:700;color:#fff">${name[0].toUpperCase()}</span>`;
+  const nm=document.getElementById('aipName');if(nm)nm.textContent=name;
+  pop.classList.add('open');
+  setTimeout(()=>document.addEventListener('click',_closeAdminInspectOutside),10);
+}
+function closeAdminInspect(){document.getElementById('adminInspectPopover')?.classList.remove('open');document.removeEventListener('click',_closeAdminInspectOutside);}
+function _closeAdminInspectOutside(e){const pop=document.getElementById('adminInspectPopover');if(pop&&!pop.contains(e.target)&&!e.target.classList.contains('chat-admin-av-img')&&!e.target.classList.contains('chat-admin-av-fallback'))closeAdminInspect();}
 function _chatFmtTime(d){return d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
 
 function _renderChatMessages() {
   const container=document.getElementById('chatMessages');if(!container)return;
-  container.querySelectorAll('.chat-msg-row').forEach(m=>m.remove());
-  _chatMessages.forEach(msg=>_appendChatBubble(msg,false));
+  container.querySelectorAll('.chat-msg-row,.chat-admin-header').forEach(m=>m.remove());
+  _chatMessages.forEach((msg,i)=>_appendChatBubble(msg,false,i));
   container.scrollTop=container.scrollHeight;
 }
 
 function _shouldShowAvatar(index,messages){if(index===0)return true;return messages[index].own!==messages[index-1].own;}
 
-function _appendChatBubble(msg,animate=true) {
+function _appendChatBubble(msg,animate=true,msgIndex=null) {
   const container=document.getElementById('chatMessages');if(!container)return;
-  const plan=currentUser?.plan||'basico',avatar=currentUser?.email?getUserAvatar(currentUser.email):null,name=currentUser?.name||'Visitante',initial=name[0]?.toUpperCase()||'V';
-  const msgIndex=_chatMessages.length-1,showAvatar=_shouldShowAvatar(msgIndex,_chatMessages);
+  if(msgIndex===null)msgIndex=_chatMessages.length-1;
+  const showHeader=_shouldShowAvatar(msgIndex,_chatMessages);
+
+  if(!msg.own&&showHeader){
+    const adminName=msg.admin_name||_chatAdminName||'Admin';
+    const headerRow=document.createElement('div');
+    headerRow.className='chat-admin-header'+(animate?' anim-in':'');
+    const avHtml=_chatAdminAvatar
+      ?`<img src="${_chatAdminAvatar}" class="chat-admin-av-img" onclick="openAdminInspect()" alt="${escStr(adminName)}">`
+      :`<div class="chat-admin-av-fallback" onclick="openAdminInspect()">${escStr(adminName)[0].toUpperCase()}</div>`;
+    headerRow.innerHTML=`${avHtml}<span class="chat-admin-name">${escStr(adminName)}</span>`;
+    container.appendChild(headerRow);
+  }
+
   const row=document.createElement('div');
   row.className='chat-msg-row'+(msg.own?' own':'');
   if(animate)row.style.animation='chatMsgIn .25s cubic-bezier(.34,1.56,.64,1) both';
   if(msg.own){
-    const avatarHtml=showAvatar?(avatar?`<img src="${avatar}" alt="${initial}" class="chat-avatar-img">`:`<span class="chat-avatar-initial">${initial}</span>`):'';
-    const wrapClass=showAvatar?'chat-avatar-wrap':'chat-avatar-spacer';
-    row.innerHTML=`<div class="chat-bubble own">${escStr(msg.text)}<span class="chat-bubble-time">${msg.time}</span></div><div class="${wrapClass}" ${showAvatar?`onclick="openChatProfile()"`:''}>${avatarHtml}</div>`;
-  } else {
-    const ghostHtml=showAvatar?(_chatAdminAvatar?`<div class="chat-ghost-ico"><img src="${_chatAdminAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></div>`:`<div class="chat-ghost-ico" style="background:var(--p2,#6366f1);display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:.7rem;font-weight:700;color:#fff">A</div>`):`<div class="chat-avatar-spacer"></div>`;
-    row.innerHTML=`${ghostHtml}<div class="chat-bubble ghost">${escStr(msg.text)}<span class="chat-bubble-time">${msg.time}</span></div>`;
+    row.innerHTML=`<div class="chat-bubble own">${escStr(msg.text)}<span class="chat-bubble-time">${msg.time}</span></div>`;
+  }else{
+    row.innerHTML=`<div class="chat-bubble ghost">${escStr(msg.text)}<span class="chat-bubble-time">${msg.time}</span></div>`;
   }
   container.appendChild(row);container.scrollTop=container.scrollHeight;
 }
