@@ -825,42 +825,53 @@ input::placeholder{color:rgba(148,163,184,.25)}
 .chat-system-time { font-size:.65rem;color:var(--muted);margin-top:6px;display:block; }
 
 /* linhas de mensagem */
-.chat-msg-row { display:flex;align-items:flex-end;gap:8px;max-width:85%; }
-.chat-msg-row.own { align-self:flex-end;flex-direction:row-reverse; }
+.chat-msg-row { display:flex;max-width:82%; }
+.chat-msg-row.own { align-self:flex-end; }
+
+/* header do admin (avatar + nome) */
+.chat-admin-header {
+  display:flex;align-items:center;gap:8px;
+  margin-top:16px;margin-bottom:4px;
+}
+.chat-admin-header:first-child { margin-top:0; }
+.chat-admin-header.anim-in { animation:chatMsgIn .3s ease both; }
+.chat-admin-av-img {
+  width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;
+  cursor:pointer;transition:transform .15s;
+  border:1.5px solid rgba(168,85,247,.35);
+  box-shadow:0 0 0 2px rgba(168,85,247,.1);
+}
+.chat-admin-av-img:hover { transform:scale(1.1); }
+.chat-admin-av-fallback {
+  width:28px;height:28px;border-radius:50%;background:var(--grad);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.65rem;font-weight:700;color:#fff;cursor:pointer;
+  transition:transform .15s;border:1.5px solid rgba(168,85,247,.35);
+}
+.chat-admin-av-fallback:hover { transform:scale(1.1); }
+.chat-admin-name {
+  font-size:.72rem;font-weight:600;color:var(--p3);letter-spacing:.01em;
+}
 
 /* balão de mensagem */
 .chat-bubble {
-  padding:10px 13px;border-radius:1rem;font-size:.83rem;line-height:1.55;
+  padding:10px 14px;border-radius:1rem;font-size:.83rem;line-height:1.55;
   position:relative;word-break:break-word;max-width:100%;
 }
 .chat-bubble.own {
-  background:var(--grad);color:#fff;border-bottom-right-radius:.25rem;
-  box-shadow:0 2px 12px rgba(168,85,247,.2);
+  background:var(--grad);color:#fff;
+  border-radius:1rem 1rem .25rem 1rem;
+  box-shadow:0 2px 14px rgba(168,85,247,.25);
 }
 .chat-bubble.ghost {
-  background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--fg);
-  border-bottom-left-radius:.25rem;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(168,85,247,.2);
+  color:var(--fg);
+  border-radius:.25rem 1rem 1rem 1rem;
+  box-shadow:inset 0 0 0 1px rgba(168,85,247,.06);
 }
 .chat-bubble-time {
-  font-size:.58rem;opacity:.6;margin-left:8px;vertical-align:bottom;white-space:nowrap;
-}
-
-/* avatar do usuário */
-.chat-ghost-ico { font-size:1.1rem;flex-shrink:0;margin-bottom:4px; }
-.chat-avatar-wrap {
-  width:32px;height:32px;border-radius:50%;flex-shrink:0;cursor:pointer;
-  position:relative;overflow:visible;margin-bottom:4px;
-}
-.chat-avatar-wrap:hover { transform:scale(1.08); }
-.chat-avatar-img { width:100%;height:100%;border-radius:50%;object-fit:cover; }
-.chat-avatar-initial {
-  width:32px;height:32px;border-radius:50%;background:var(--grad);
-  display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#fff;
-}
-.chat-avatar-ring { display:none; }
-.chat-avatar-crown {
-  position:absolute;top:-9px;left:50%;transform:translateX(-50%);
-  font-size:.65rem;pointer-events:none;
+  font-size:.58rem;opacity:.55;margin-left:8px;vertical-align:bottom;white-space:nowrap;
 }
 
 /* popover de perfil */
@@ -1043,9 +1054,36 @@ input::placeholder{color:rgba(148,163,184,.25)}
   font-size: .72rem !important;
 }
 
-/* Avatar spacer — mantém alinhamento quando avatar não aparece */
-.chat-avatar-spacer {
-  width:32px;height:1px;flex-shrink:0;
+/* popover de inspeção do admin */
+.admin-inspect-popover {
+  position:absolute;bottom:80px;left:16px;
+  background:#0d0d1e;border:1px solid rgba(168,85,247,.2);border-radius:1rem;
+  padding:20px 18px 16px;min-width:160px;z-index:50;
+  box-shadow:0 16px 40px rgba(0,0,0,.7),0 0 0 1px rgba(168,85,247,.08);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .2s,transform .2s,visibility .2s;
+  transform:translateY(6px) scale(.97);
+}
+.admin-inspect-popover.open {
+  opacity:1;visibility:visible;pointer-events:all;transform:translateY(0) scale(1);
+}
+.aip-close {
+  position:absolute;top:8px;right:10px;font-size:.72rem;color:var(--muted);
+  cursor:pointer;transition:color .15s;padding:4px;
+}
+.aip-close:hover { color:var(--fg); }
+.aip-avatar {
+  width:52px;height:52px;border-radius:50%;margin:0 auto 10px;
+  background:var(--grad);display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;font-weight:700;color:#fff;overflow:hidden;
+  box-shadow:0 0 0 3px rgba(168,85,247,.25);
+}
+.aip-name { text-align:center;font-weight:700;font-size:.9rem;margin-bottom:4px;color:var(--fg); }
+.aip-badge {
+  text-align:center;font-size:.67rem;font-weight:600;
+  color:var(--p3);background:rgba(168,85,247,.1);
+  border:1px solid rgba(168,85,247,.18);border-radius:99px;
+  padding:3px 10px;margin-top:2px;display:inline-block;width:100%;
 }
 
 /* ── ANIMAÇÃO TROCAR FOTO ── */
