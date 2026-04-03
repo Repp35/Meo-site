@@ -613,7 +613,7 @@ function showPage(id, pushHistory = true) {
   else { nav.classList.add('hidden'); closeMenu(); } // fecha menu ao sair da home
   if (storeHero) storeHero.style.display = id === 'store' ? 'flex' : 'none';
   if (id === 'modules') { updateBalloon(); updateCpfProCard(); updateCreditsBalloon(); updateModulesBanner(); }
-  if (id === 'chat')     { _renderChatUserAvatar(); _setChatWelcomeTime(); _startChatPoll(); }
+  if (id === 'chat')     { _renderChatUserAvatar(); _setChatWelcomeTime(); }
   if (id !== 'chat')     { _stopChatPoll(); }
   if (id === 'thankyou')  { const q = document.getElementById('tyQuestion'); if(q) { q.style.opacity=''; q.style.transform=''; q.style.transition=''; } }
   if (pushHistory) {
