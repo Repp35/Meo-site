@@ -407,7 +407,13 @@ async function _loadChatAdminAvatar() {
     const adminName=msgs?.[0]?.admin_name||null;
     const query=adminName?`select=avatar_url,display_name&display_name=eq.${encodeURIComponent(adminName)}&limit=1`:`select=avatar_url,display_name&avatar_url=not.is.null&limit=1`;
     const rows=await sbGet('admins',query);
-    _chatAdminAvatar=rows?.[0]?.avatar_url||null;_chatAdminName=rows?.[0]?.display_name||null;
+    _chatAdminAvatar=rows?.[0]?.avatar_url||null;
+    _chatAdminName=rows?.[0]?.display_name||adminName||null;
+    // se achou o admin pelo nome mas sem foto, tenta qualquer admin com foto
+    if(adminName&&!_chatAdminAvatar){
+      const fallback=await sbGet('admins',`select=avatar_url&avatar_url=not.is.null&limit=1`);
+      _chatAdminAvatar=fallback?.[0]?.avatar_url||null;
+    }
   }catch{_chatAdminAvatar=null;_chatAdminName=null;}
 }
 function _subscribeAdminAvatar() {
