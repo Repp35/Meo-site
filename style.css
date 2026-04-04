@@ -831,7 +831,7 @@ input::placeholder{color:rgba(148,163,184,.25)}
 /* header do admin (avatar + nome) */
 .chat-admin-header {
   display:flex;align-items:center;gap:8px;
-  margin-top:16px;margin-bottom:4px;
+  margin-top:10px;margin-bottom:4px;
 }
 .chat-admin-header:first-child { margin-top:0; }
 .chat-admin-header.anim-in { animation:chatMsgIn .3s ease both; }
