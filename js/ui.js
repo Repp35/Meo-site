@@ -402,7 +402,13 @@ function goChat() {
 }
 
 async function _loadChatAdminAvatar() {
-  try{const rows=await sbGet('admins','select=avatar_url,display_name&limit=1');_chatAdminAvatar=rows?.[0]?.avatar_url||null;_chatAdminName=rows?.[0]?.display_name||null;}catch{_chatAdminAvatar=null;_chatAdminName=null;}
+  try{
+    const msgs=await sbGet('chats',`user_key=eq.${encodeURIComponent(currentUser?.email||'')}&role=eq.admin&order=created_at.desc&limit=1`);
+    const adminName=msgs?.[0]?.admin_name||null;
+    const query=adminName?`select=avatar_url,display_name&display_name=eq.${encodeURIComponent(adminName)}&limit=1`:`select=avatar_url,display_name&avatar_url=not.is.null&limit=1`;
+    const rows=await sbGet('admins',query);
+    _chatAdminAvatar=rows?.[0]?.avatar_url||null;_chatAdminName=rows?.[0]?.display_name||null;
+  }catch{_chatAdminAvatar=null;_chatAdminName=null;}
 }
 function _subscribeAdminAvatar() {
   if(_adminAvatarChannel)return;
