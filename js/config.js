@@ -1,6 +1,3 @@
-// ═══════════════════════════════════════
-// GHOST BUSCA — Configurações e Constantes
-// ═══════════════════════════════════════
 
 // ── PLANOS ──
 const PLAN_LIMITS = {
@@ -10,7 +7,7 @@ const PLAN_LIMITS = {
   premium: { label:'Premium', cpf:-1, cpfpro:-1, cnpj:-1, cep:-1, ip:-1, whois:-1, nome:-1, familiares:-1, telefone:-1, email:-1, placa:-1, cnh:-1, foto:2,  pix:-1,  cns:-1,  renavam:-1,  total:999 },
 };
 
-// ── CORES DOS PLANOS (único lugar, evita duplicação) ──
+// CORES DOS PLANOS (único lugar, evita duplicação)
 const PLAN_COLORS = {
   basico:  { grad:'linear-gradient(135deg,#22c55e,#16a34a)', glow:'rgba(34,197,94,.5)',  label:'Básico'  },
   starter: { grad:'linear-gradient(135deg,#a855f7,#7c3aed)', glow:'rgba(168,85,247,.5)', label:'Starter' },
@@ -38,11 +35,11 @@ const PLAN_BADGE_COLORS = {
   premium: { bg:'rgba(244,114,182,.1)',  color:'#f472b6', border:'rgba(244,114,182,.28)' },
 };
 
-// ── PLANOS — duração e nomes ──
+// PLANOS — duração e nomes
 const PLAN_DURATIONS = { starter:7, pro:15, premium:30 };
 const PLAN_NAMES_PT  = { starter:'Starter', pro:'Pro', premium:'Premium' };
 
-// ── HISTÓRICO — chaves ──
+// HISTÓRICO — chaves
 const HIST_KEY         = (email) => `ghost_hist_${email}`;
 const HIST_ENABLED_KEY = (email) => `ghost_hist_on_${email}`;
 
