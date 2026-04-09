@@ -1,8 +1,5 @@
-// ═══════════════════════════════════════
-// GHOST BUSCA — Módulo de Busca
 // Se este arquivo quebrar, só a busca falha.
 // Auth, nav, store, wallet continuam funcionando.
-// ═══════════════════════════════════════
 
 try {
 
@@ -10,7 +7,7 @@ try {
 function autoFmt(el) {
   if(['ip','whois','nome','email','foto','familiares'].includes(curMod)) return;
 
-  // ── PIX: extrai números de qualquer texto colado, formata como CPF mascarado ──
+  // PIX: extrai números de qualquer texto colado, formata como CPF mascarado
   if(curMod === 'pix') {
     const digits = el.value.replace(/\D/g, '').slice(0, 6);
     if(!digits) { el.value = ''; return; }
@@ -275,7 +272,7 @@ async function searchCEP(cep) {
   return [o, ...moradores];
 }
 
-// ── IP ──
+// IP
 async function searchIP(ip) {
   const t = ip.trim();
   const fi = d => ({ip:d.ip||t,tipo:d.type||null,cidade:d.city||null,regiao:d.region||null,pais:`${d.country||''} (${d.country_code||''})`,continente:d.continent||null,latitude:d.latitude?String(d.latitude):null,longitude:d.longitude?String(d.longitude):null,timezone:d.timezone?.id||null,provedor:d.connection?.isp||null,org:d.connection?.org||null,asn:d.connection?.asn?`AS${d.connection.asn}`:null});
@@ -356,7 +353,7 @@ const MOD_MIN_LEN = {
   cpf:9, cpfpro:9, cnpj:14, cep:8, placa:7, cnh:11, telefone:9, cns:15, renavam:9,
 };
 
-// ── PARSE CPF PARCIAL (Pix) ──
+// PARSE CPF PARCIAL (Pix)
 function parseCpfParcial(val) {
   // extrai só dígitos e asteriscos/pontos/traços
   // exemplos aceitos: ***.723.262-**, .723.262-, 723.262, 723262
@@ -873,6 +870,12 @@ function renderWithSections(item, sections){
   return html;
 }
 
+  // EXPOR GLOBALS (funções usadas pelo HTML e outros módulos)
+  window.doSearch      = doSearch;
+  window.autoFmt       = autoFmt;
+  window.renderErr     = renderErr;
+  window._runSearch    = _runSearch;
+  window.renderResults = renderResults;
 
   console.log("[ghost:search] módulo carregado ✓");
 } catch(e) {
