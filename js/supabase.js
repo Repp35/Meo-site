@@ -1,46 +1,39 @@
-// ═══════════════════════════════════════
-// GHOST BUSCA — Camada Supabase
-// ═══════════════════════════════════════
 try {
 
-window.sbGet = async function sbGet(table, query='') {
+// ── CLIENT ──
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+window._sb = _sb;
+
+// JWT dinâmico — inclui token do usuário logado pra RLS funcionar
+async function getAuthHeaders() {
+  const { data: { session } } = await _sb.auth.getSession();
+  const token = session?.access_token;
+  return {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_ANON,
+    'Authorization': 'Bearer ' + (token || SUPABASE_ANON)
+  };
+}
+
+window.sbGet = async function(table, query='') {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: SB_HEADERS });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: await getAuthHeaders() });
     if (!r.ok) return null;
     const d = await r.json();
     return Array.isArray(d) ? d : null;
   } catch { return null; }
 };
-window.sbGetOne = async function sbGetOne(table, query='') {
+
+window.sbGetOne = async function(table, query='') {
   const d = await sbGet(table, query + '&limit=1');
   return d?.[0] || null;
 };
-window.sbPost = async function sbPost(table, body) {
+
+window.sbPost = async function(table, body) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-      method: 'POST', headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return Array.isArray(d) ? d[0] : d;
-  } catch { return null; }
-};
-window.sbPatch = async function sbPatch(table, query, body) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
-      method: 'PATCH', headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return Array.isArray(d) ? d[0] : d;
-  } catch { return null; }
-};
-window.sbUpsert = async function sbUpsert(table, body, onConflict) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
-      method: 'POST', headers: { ...SB_HEADERS, 'Prefer': 'return=representation,resolution=merge-duplicates' },
+      method: 'POST',
+      headers: { ...(await getAuthHeaders()), 'Prefer': 'return=representation' },
       body: JSON.stringify(body)
     });
     if (!r.ok) return null;
@@ -49,17 +42,45 @@ window.sbUpsert = async function sbUpsert(table, body, onConflict) {
   } catch { return null; }
 };
 
-// ── SUPABASE STORAGE — avatars ──
-window.sbUploadAvatar = async function sbUploadAvatar(email, blob) {
+window.sbPatch = async function(table, query, body) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+      method: 'PATCH',
+      headers: { ...(await getAuthHeaders()), 'Prefer': 'return=representation' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d[0] : d;
+  } catch { return null; }
+};
+
+window.sbUpsert = async function(table, body, onConflict) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
+      method: 'POST',
+      headers: { ...(await getAuthHeaders()), 'Prefer': 'return=representation,resolution=merge-duplicates' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d[0] : d;
+  } catch { return null; }
+};
+
+// ── STORAGE — avatars ──
+window.sbUploadAvatar = async function(email, blob) {
   try {
     const ext  = blob.type === 'image/png' ? 'png' : 'jpg';
     const path = `${email.replace(/[^a-z0-9]/gi,'_')}.${ext}`;
-    // remove arquivo antigo primeiro (ignora erro)
     await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${path}`, {
-      method: 'DELETE', headers: SB_HEADERS
+      method: 'DELETE', headers: await getAuthHeaders()
     }).catch(()=>{});
+    const uploadHeaders = await getAuthHeaders();
+    delete uploadHeaders['Content-Type'];
     const r = await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${path}`, {
-      method: 'POST', headers: { ...SB_HEADERS, 'Content-Type': blob.type, 'x-upsert': 'true' },
+      method: 'POST',
+      headers: { ...uploadHeaders, 'Content-Type': blob.type, 'x-upsert': 'true' },
       body: blob
     });
     if (!r.ok) return null;
@@ -69,11 +90,11 @@ window.sbUploadAvatar = async function sbUploadAvatar(email, blob) {
 
 } catch(e) {
   console.error("[ghost:supabase] ERRO FATAL:", e);
-  // Stub functions para não quebrar o resto
   window.sbGet    = async () => null;
   window.sbGetOne = async () => null;
   window.sbPost   = async () => null;
   window.sbPatch  = async () => null;
   window.sbUpsert = async () => null;
   window.sbUploadAvatar = async () => null;
+  window._sb = null;
 }
