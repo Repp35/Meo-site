@@ -1,13 +1,8 @@
-// ═══════════════════════════════════════
-// GHOST BUSCA — Features: Store + Planos + Compra
-// ═══════════════════════════════════════
 
 // ── HELPERS ──
 function escStr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-// ═══════════════════════════════════════
-// STORE
-// ═══════════════════════════════════════
+// ── STORE ──
 function _normProduct(p){if(!p)return null;return{id:p.id,name:p.name||'',desc:p.description||'',descFull:p.description||'',img:p.image_url||null,tag:Array.isArray(p.tags)?p.tags[0]||'':(p.tags||p.tag||''),price:Number(p.price)||0,priceOld:p.price_old?Number(p.price_old):null,discount:p.discount||null,buyUrl:p.buy_url||null,active:p.active!==false};}
 function prodImgSrc(img){if(!img)return null;if(img.startsWith('data:')||img.startsWith('blob:'))return null;return img;}
 
@@ -97,18 +92,16 @@ function initUpgradeCarousel(){
   setTimeout(()=>goToInstantU(cur),60);setTimeout(()=>goToInstantU(cur),300);
 }
 
-// ═══════════════════════════════════════
-// COMPRA DE PLANO
-// ═══════════════════════════════════════
+// ── COMPRA DE PLANO ──
 function buyPlan(plan,btn){
   if(!currentUser||currentUser.anon){openModal('modal-login');return;}
   const orig=btn?.innerHTML;
   if(btn){btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .6s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Processando...';btn.disabled=true;}
   setTimeout(async()=>{
     const oldPlan=currentUser.plan,expiresAt=new Date(Date.now()+PLAN_DURATIONS[plan]*86400000).toISOString();
-    await sbPatch('users',`email=eq.${encodeURIComponent(currentUser.email)}`,{plan,plan_expires_at:expiresAt});
+    await sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{plano:plan,plan_expires_at:expiresAt});
     currentUser.plan=plan;currentUser.planExpiresAt=Date.now()+PLAN_DURATIONS[plan]*86400000;
-    queryCounters=await getDailyCounters(currentUser.email,plan);updateNavUser();
+    queryCounters=await getDailyCounters(currentUser.id,plan);updateNavUser();
     histAdd({type:'plano',name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`,value:null,free:false});
     if(btn){btn.innerHTML=orig;btn.disabled=false;}
     closeMenu();
@@ -118,7 +111,7 @@ function buyPlan(plan,btn){
   },1200);
 }
 
-// ── COMPRA DE CRÉDITOS (versão completa com showThankYou) ──
+// COMPRA DE CRÉDITOS (versão completa com showThankYou)
 function buyCreditsNow(){
   const cost=_creditsTargetMod?(MOD_CREDITS[_creditsTargetMod]||1):1;
   const totalCred=Math.round(cost*_creditsQty*100)/100;
