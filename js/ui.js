@@ -1,7 +1,4 @@
-// ═══════════════════════════════════════
-// GHOST BUSCA — UI: Animações + Visual + Rendering
 // Contém: animações 3D, wallet, histórico, settings, chat
-// ═══════════════════════════════════════
 
 // ── ANIMAÇÃO DE UPGRADE ──
 function playUpgradeAnimation(oldPlan, newPlan, onDone) {
@@ -128,7 +125,7 @@ function _runTyAnimation() {
   requestAnimationFrame(draw);
 }
 
-// ── THANK YOU + SUPORTE ──
+// THANK YOU + SUPORTE
 function showThankYou(type, planOrAmount) {
   pushNav('thankyou');
   showPage('thankyou');
@@ -193,7 +190,7 @@ function showWelcomeCouponModal() {
 function wcBtnAction() { closeWelcomeCouponModal(); if(!currentUser||currentUser.anon)setTimeout(()=>openModal('modal-register'),180); }
 function closeWelcomeCouponModal() {
   document.getElementById('welcomeCouponModal')?.classList.remove('open');
-  if(currentUser&&!currentUser.anon) sbPatch('users',`email=eq.${encodeURIComponent(currentUser.email)}`,{welcome_coupon_used:true}).catch(()=>{});
+  if(currentUser&&!currentUser.anon) sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{welcome_coupon_used:true}).catch(()=>{});
 }
 
 // ── INPUT DE QUANTIDADE DE CRÉDITOS ──
@@ -201,9 +198,7 @@ function onCreditsQtyInput(el) {
   let v=parseInt(el.value)||1; v=Math.max(1,Math.min(100,v)); _creditsQty=v; el.value=v; renderCreditsSummary(); updatePresetsUI();
 }
 
-// ═══════════════════════════════════════
 // WALLET — renderização
-// ═══════════════════════════════════════
 function goWallet() {
   if(!currentUser||currentUser.anon){openModal('modal-register');return;}
   pushNav('wallet'); showPage('wallet'); renderWallet();
@@ -270,14 +265,12 @@ function removeAvatar() {
   if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');}
   setTimeout(async()=>{
     if(currentUser)currentUser.avatar_url=null;
-    await sbPatch('users',`email=eq.${encodeURIComponent(currentUser.email)}`,{avatar_url:null});
+    await sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{avatar_url:null});
     updateNavUser();renderSettings();
   },220);
 }
 
-// ═══════════════════════════════════════
 // HISTÓRICO + SETTINGS
-// ═══════════════════════════════════════
 function goHistory() { pushNav('history'); renderHistory(); showPage('history'); }
 function goSettings() { pushNav('settings'); renderSettings(); showPage('settings'); }
 function goUpgradePage() { goPlansFromResults(); closeMenu(); }
@@ -370,9 +363,7 @@ function toggleUsageDetail() {
   if(label){label.style.transition='color .2s ease';label.style.color='var(--p3)';setTimeout(()=>{label.style.color='var(--p)';},1500);}
 }
 
-// ═══════════════════════════════════════
-// CHAT DE SUPORTE
-// ═══════════════════════════════════════
+// ── CHAT DE SUPORTE ──
 let _chatLastSend   = 0;
 let _chatMsgTimes   = [];
 let _chatMessages   = [];
@@ -538,9 +529,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(wel)wel.textContent=_chatFmtTime(new Date());
 });
 
-// ═══════════════════════════════════════
 // CANVAS 3D + EFEITOS VISUAIS
-// ═══════════════════════════════════════
 (function(){
   const canvas=document.getElementById('room3d');
   const isMobile=window.innerWidth<900;
@@ -594,7 +583,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 function detectDevice(){const isDesktop=window.innerWidth>=900;document.body.classList.toggle('is-desktop',isDesktop);document.body.classList.toggle('is-mobile',!isDesktop);}
 detectDevice();window.addEventListener('resize',detectDevice);
 
-// ── SCROLL FADE (plans) ──
+// SCROLL FADE (plans)
 (function(){
   const targets=document.querySelectorAll('#plans .plans-label, #plans .plans-title, #plans .plans-sub, #plans .plans-carousel-wrap, #plans .plans-dots, #plans .plans-drag-hint');
   targets.forEach(el=>el.classList.add('scroll-fade'));
@@ -605,7 +594,7 @@ detectDevice();window.addEventListener('resize',detectDevice);
 // ── FIX OVERFLOW SCROLL ──
 document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend',()=>{if(!document.querySelector('.modal-overlay.open')&&!document.getElementById('navDropdown')?.classList.contains('open'))document.body.style.overflow='';});});
 
-// ── TILT 3D — CARDS DE CRÉDITO ──
+// TILT 3D — CARDS DE CRÉDITO
 (function(){
   function initCinfoCards(){document.querySelectorAll('.cinfo-card').forEach(card=>{card.addEventListener('mousemove',e=>{const r=card.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;card.style.transform=`perspective(500px) rotateX(${-y*10}deg) rotateY(${x*10}deg) translateY(-3px)`;});card.addEventListener('mouseleave',()=>{card.style.transform='';card.style.transition='transform .4s ease, border-color .25s, background .25s, box-shadow .25s';setTimeout(()=>card.style.transition='',400);});let pressTimer;card.addEventListener('touchstart',()=>{pressTimer=setTimeout(()=>{card.style.transform='scale(1.04)';card.style.boxShadow='0 16px 40px rgba(0,0,0,.4), 0 0 0 1px rgba(168,85,247,.2)';},400);},{passive:true});card.addEventListener('touchend',()=>{clearTimeout(pressTimer);card.style.transform='';card.style.boxShadow='';});});}
   const cinfoPage=document.getElementById('page-credits-info');
@@ -666,7 +655,7 @@ document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend
   setTimeout(()=>goToInstant(cur),60);setTimeout(()=>goToInstant(cur),350);window.addEventListener('load',()=>{goToInstant(cur);setTimeout(()=>goToInstant(cur),200);});
 })();
 
-// ── TILT 3D — MODULE CARDS ──
+// TILT 3D — MODULE CARDS
 (function(){
   document.querySelectorAll('.mc:not(.soon)').forEach(card=>{
     card.addEventListener('mousemove',e=>{const r=card.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;card.style.setProperty('--rx',(-y*14)+'deg');card.style.setProperty('--ry',(x*14)+'deg');});
