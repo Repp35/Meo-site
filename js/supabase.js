@@ -83,9 +83,20 @@ window.sbUploadAvatar = async function(email, blob) {
       headers: { ...uploadHeaders, 'Content-Type': blob.type, 'x-upsert': 'true' },
       body: blob
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      let errMsg = `HTTP ${r.status}`;
+      try { const j = await r.json(); errMsg += ': ' + (j.message || j.error || JSON.stringify(j)); } catch {}
+      console.error('[ghost:avatar] Upload falhou —', errMsg);
+      window._avatarUploadError = errMsg;
+      return null;
+    }
+    window._avatarUploadError = null;
     return `${SUPABASE_URL}/storage/v1/object/public/avatars/${path}?t=${Date.now()}`;
-  } catch { return null; }
+  } catch(e) {
+    console.error('[ghost:avatar] Exceção no upload:', e);
+    window._avatarUploadError = e?.message || 'Erro desconhecido';
+    return null;
+  }
 };
 
 } catch(e) {
