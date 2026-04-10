@@ -307,7 +307,10 @@ function confirmCrop(){
   const img=document.getElementById('ghost-cropImg');
   const canvas=document.createElement('canvas');canvas.width=canvas.height=260;
   const ctx=canvas.getContext('2d');ctx.beginPath();ctx.arc(130,130,130,0,Math.PI*2);ctx.clip();
-  ctx.drawImage(img,-_cropX,-_cropY,img.naturalWidth*_cropScale,img.naturalHeight*_cropScale);
+  // converte coordenadas da stage para coordenadas naturais da imagem
+  const sx=-_cropX/_cropScale, sy=-_cropY/_cropScale;
+  const sw=_CROP_STAGE/_cropScale, sh=_CROP_STAGE/_cropScale;
+  ctx.drawImage(img,sx,sy,sw,sh,0,0,260,260);
   const dataUrl=canvas.toDataURL('image/jpeg',.92);
   closeCropper();
   if(_cropCallback)_cropCallback(dataUrl);
@@ -317,6 +320,11 @@ function triggerAvatarUpload() {
   const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
   inp.onchange=e=>{
     const file=e.target.files[0]; if(!file)return;
+    const allowed=['image/jpeg','image/jpg','image/png','image/webp','image/gif'];
+    if(!allowed.includes(file.type)){
+      showToast('Formato inválido. Use JPG, PNG, WEBP ou GIF.','error');
+      return;
+    }
     const doUpload = async dataUrl => {
       const avatarEl=document.querySelector('.settings-avatar');
       if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');setTimeout(()=>avatarEl.classList.remove('avatar-swapping'),500);}
@@ -334,6 +342,18 @@ function triggerAvatarUpload() {
       updateNavUser(); renderSettings();
       showToast('Foto atualizada!');
     };
+    // GIF pula o cropper pra preservar a animação
+    if(file.type==='image/gif'){
+      const avatarEl=document.querySelector('.settings-avatar');
+      if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');setTimeout(()=>avatarEl.classList.remove('avatar-swapping'),500);}
+      window._avatarUploadError=null;
+      setUserAvatar(currentUser.email,file).then(()=>{
+        if(window._avatarUploadError){showToast('Erro ao salvar foto: '+window._avatarUploadError,'error');return;}
+        if(!currentUser.avatar_url){showToast('Erro ao salvar foto. Verifique bucket "avatars" no Supabase.','error');return;}
+        updateNavUser();renderSettings();showToast('Foto animada salva! 🎉');
+      });
+      return;
+    }
     createImageBitmap(file).then(bmp=>{
       const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;
       c.getContext('2d').drawImage(bmp,0,0);
@@ -353,7 +373,7 @@ function removeAvatar() {
   setTimeout(async()=>{
     // deleta do Storage (tenta jpg e png)
     const base=currentUser.email.replace(/[^a-z0-9]/gi,'_');
-    for(const ext of ['jpg','png']){
+    for(const ext of ['jpg','png','gif','webp']){
       await sbDeleteAvatar(`${base}.${ext}`);
     }
     if(currentUser)currentUser.avatar_url=null;
