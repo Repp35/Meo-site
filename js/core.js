@@ -1235,6 +1235,20 @@ function toggleMenu() {
     dd.classList.add('open');
     overlay?.classList.add('on');
     closeAllPlanDetails();
+
+    // DEBUG VISUAL — aparece quando o menu abre
+    setTimeout(() => {
+      document.getElementById('__dbg')?.remove();
+      const abertos = [...document.querySelectorAll('.open, .on')];
+      const overflow = document.body.style.overflow || '(ok)';
+      const linhas = abertos.map(el => `• ${el.id||'sem-id'} → ${[...el.classList].join(' ')}`);
+      const txt = `overflow: ${overflow}\n\n.open/.on ativos:\n${linhas.join('\n')}`;
+      const box = document.createElement('div');
+      box.id = '__dbg';
+      box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#000;color:#0f0;font:11px monospace;padding:10px;white-space:pre-wrap;max-height:60vh;overflow-y:auto;border-bottom:2px solid #0f0';
+      box.textContent = txt;
+      document.body.appendChild(box);
+    }, 200);
   }
 }
 function closeMenu() {
@@ -1242,6 +1256,8 @@ function closeMenu() {
   document.getElementById('storeMenuBtn')?.classList.remove('open');
   document.getElementById('navDropdown')?.classList.remove('open');
   document.getElementById('menuBlurOverlay')?.classList.remove('on');
+
+
 }
 document.addEventListener('click', e => {
   const btn      = document.getElementById('menuBtn');
