@@ -52,7 +52,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #noise-overlay{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.028;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");background-size:200px 200px}
 
 /* ── NAV ── */
-nav{position:fixed;top:0;left:0;right:0;z-index:300;background:rgba(8,8,16,.82);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.06);transition:opacity .3s,visibility .3s}
+nav{position:fixed;top:0;left:0;right:0;z-index:300;background:rgba(8,8,16,.82);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.06);transition:opacity .3s,visibility .3s,box-shadow .3s}
 nav.hidden{opacity:0;visibility:hidden;pointer-events:none}
 .nav-inner{max-width:1100px;margin:0 auto;padding:0 24px;height:62px;display:flex;align-items:center;justify-content:space-between}
 .nav-logo{display:flex;align-items:center;gap:9px;font-family:var(--font-display);font-size:1.05rem;font-weight:700;letter-spacing:-.01em;cursor:pointer}
@@ -1496,8 +1496,21 @@ html{height:-webkit-fill-available}
 .nav-menu-btn.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
 .nav-menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
 .nav-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
-.nav-dropdown{position:fixed;top:60px;left:0;right:0;z-index:250;background:rgba(8,8,16,.82);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;max-height:0;transition:max-height .2s cubic-bezier(.4,0,.2,1),opacity .15s ease,visibility .15s;opacity:0;visibility:hidden;pointer-events:none}
+.nav-dropdown{position:fixed;top:60px;left:0;right:0;z-index:250;background:rgba(5,5,12,.98);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;max-height:0;transition:max-height .2s cubic-bezier(.4,0,.2,1),opacity .15s ease,visibility .15s;opacity:0;visibility:hidden;pointer-events:none}
 .nav-dropdown.open{max-height:680px;opacity:1;visibility:visible;pointer-events:all}
+
+/* ── VIGNETTE NO MENU ABERTO ── */
+nav.menu-open,
+.nav-dropdown.open {
+  box-shadow: inset 60px 0 80px rgba(0,0,0,.18), inset -60px 0 80px rgba(0,0,0,.18);
+}
+nav.menu-open {
+  box-shadow: inset 60px 0 80px rgba(0,0,0,.18), inset -60px 0 80px rgba(0,0,0,.18), 0 1px 0 rgba(255,255,255,.06);
+}
+.nav-dropdown {
+  box-shadow: none;
+  transition: max-height .2s cubic-bezier(.4,0,.2,1), opacity .15s ease, visibility .15s, box-shadow .3s;
+}
 .menu-blur-overlay{position:fixed;inset:0;top:60px;z-index:249;background:rgba(8,8,15,.4);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .25s}
 .menu-blur-overlay.on{opacity:1;pointer-events:all}
 .nav-dropdown-inner{padding:14px 16px 20px}
