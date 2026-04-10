@@ -539,9 +539,8 @@ async function _loadChatAdminAvatar() {
 }
 function _subscribeAdminAvatar() {
   if(_adminAvatarChannel)return;
-  const sb=window.supabase?.createClient?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON):null;
-  if(!sb)return;
-  _adminAvatarChannel=sb.channel('admin-avatar').on('postgres_changes',{event:'UPDATE',schema:'public',table:'admins'},payload=>{if(payload.new?.avatar_url)_chatAdminAvatar=payload.new.avatar_url;}).subscribe();
+  if(!window._sb)return;
+  _adminAvatarChannel=window._sb.channel('admin-avatar').on('postgres_changes',{event:'UPDATE',schema:'public',table:'admins'},payload=>{if(payload.new?.avatar_url)_chatAdminAvatar=payload.new.avatar_url;}).subscribe();
 }
 
 async function _openChatPage() {
