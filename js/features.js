@@ -101,7 +101,7 @@ function buyPlan(plan,btn){
     const oldPlan=currentUser.plan,expiresAt=new Date(Date.now()+PLAN_DURATIONS[plan]*86400000).toISOString();
     await sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{plano:plan,plan_expires_at:expiresAt});
     currentUser.plan=plan;currentUser.planExpiresAt=Date.now()+PLAN_DURATIONS[plan]*86400000;
-    queryCounters=await getDailyCounters(currentUser.id,plan);updateNavUser();
+    queryCounters=await getDailyCounters(currentUser.email,plan);updateNavUser();
     histAdd({type:'plano',name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`,value:null,free:false});
     if(btn){btn.innerHTML=orig;btn.disabled=false;}
     closeMenu();
