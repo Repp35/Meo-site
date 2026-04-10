@@ -7,6 +7,29 @@ let activeCoupon = null;
 
 // ── AUTH & CONTA — Supabase ──
 
+// ── helpers de scroll lock (trava scroll sem bloquear cliques) ──
+let _scrollLockCount = 0;
+function lockScroll() {
+  _scrollLockCount++;
+  if (_scrollLockCount > 1) return;
+  const sy = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${sy}px`;
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.dataset.scrollY = sy;
+}
+function unlockScroll() {
+  _scrollLockCount = Math.max(0, _scrollLockCount - 1);
+  if (_scrollLockCount > 0) return;
+  const sy = parseInt(document.body.dataset.scrollY || '0', 10);
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  window.scrollTo(0, sy);
+}
+
 // ── helpers de storage local (apenas para preferências leves) ──
 const LS = {
   get:  k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -1027,7 +1050,7 @@ async function _doSaveProfile() {
 }
 
 // ── MODALS ──
-function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open'); document.body.style.overflow='hidden'; window._overlayOpen = true; }
+function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open'); lockScroll(); window._overlayOpen = true; }
 function closeModal(id){
   const overlay = document.getElementById(id);
   const modal   = overlay?.querySelector('.modal');
@@ -1037,7 +1060,7 @@ function closeModal(id){
   setTimeout(() => {
     overlay.classList.remove('open','closing');
     if (modal) modal.classList.remove('closing');
-    document.body.style.overflow = '';
+    unlockScroll();
     if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) window._overlayOpen = false;
   }, 200);
 }
@@ -1048,9 +1071,9 @@ function closeAllModals(){
     setTimeout(() => { m.classList.remove('open','closing'); if (modal) modal.classList.remove('closing'); }, 200);
   });
   setTimeout(() => {
-    // só trava scroll se menu ainda estiver aberto
+    // só libera scroll se menu também estiver fechado
     if (!document.getElementById('navDropdown')?.classList.contains('open')) {
-      document.body.style.overflow = '';
+      unlockScroll();
     }
   }, 200);
 }
@@ -1231,7 +1254,7 @@ function toggleMenu() {
     btn?.classList.add('open'); storeBtn?.classList.add('open');
     dd.classList.add('open');
     document.getElementById('menuBlurOverlay').classList.add('on');
-    document.body.style.overflow = 'hidden';
+    lockScroll();
     closeAllPlanDetails(); // fecha detalhes ao abrir menu
   }
 }
@@ -1242,7 +1265,7 @@ function closeMenu() {
   document.getElementById('menuBlurOverlay')?.classList.remove('on');
   // só libera scroll se não há modal aberto
   if (!document.querySelector('.modal-overlay.open')) {
-    document.body.style.overflow = '';
+    unlockScroll();
   }
 }
 document.addEventListener('click', e => {
