@@ -10,6 +10,7 @@ function toggleMenu() {
   else {
     btn?.classList.add('open'); storeBtn?.classList.add('open');
     dd.classList.add('open');
+    document.querySelector('nav')?.classList.add('menu-open');
     document.getElementById('menuBlurOverlay').classList.add('on');
     document.body.style.overflow = 'hidden';
     closeAllPlanDetails();
@@ -20,6 +21,7 @@ function closeMenu() {
   document.getElementById('storeMenuBtn')?.classList.remove('open');
   document.getElementById('navDropdown')?.classList.remove('open');
   document.getElementById('menuBlurOverlay')?.classList.remove('on');
+  document.querySelector('nav')?.classList.remove('menu-open');
   if (!document.querySelector('.modal-overlay.open')) {
     document.body.style.overflow = '';
   }
