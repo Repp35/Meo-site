@@ -991,6 +991,10 @@ async function _doSaveProfile() {
   currentUser.name = newNome;
   updateNavUser();
 
+  // atualiza nome visível sem re-renderizar a página inteira
+  const nameEl = document.querySelector('.settings-avatar-name');
+  if (nameEl) nameEl.textContent = newNome;
+
   if (senhaEl) senhaEl.value = '';
   if (confEl)  confEl.value  = '';
 
@@ -1007,8 +1011,6 @@ async function _doSaveProfile() {
     msgEl.className   = 'set-msg ok';
     setTimeout(() => { if (msgEl) { msgEl.textContent = ''; msgEl.className='set-msg'; } }, 2500);
   }
-
-  renderSettings();
 }
 
 // ── MODALS ──
