@@ -69,6 +69,14 @@ window.sbUpsert = async function(table, body, onConflict) {
 };
 
 // ── STORAGE — avatars ──
+window.sbDeleteAvatar = async function(path) {
+  try {
+    await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${path}`, {
+      method: 'DELETE', headers: await getAuthHeaders()
+    });
+  } catch {}
+};
+
 window.sbUploadAvatar = async function(email, blob) {
   try {
     const ext  = blob.type === 'image/png' ? 'png' : 'jpg';
