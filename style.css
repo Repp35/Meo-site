@@ -1116,8 +1116,10 @@ html{height:-webkit-fill-available}
 .filter-popup {
   position: fixed;
   bottom: -120%;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  transform: none;
   z-index: 400;
   width: min(340px, 92vw);
   background: #100e14;
@@ -1494,7 +1496,7 @@ html{height:-webkit-fill-available}
 .nav-menu-btn.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
 .nav-menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
 .nav-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
-.nav-dropdown{position:fixed;top:60px;left:0;right:0;z-index:250;background:rgba(8,8,16,.88);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;max-height:0;transition:max-height .2s cubic-bezier(.4,0,.2,1),opacity .15s ease,visibility .15s;opacity:0;visibility:hidden;pointer-events:none}
+.nav-dropdown{position:fixed;top:60px;left:0;right:0;z-index:250;background:rgba(6,6,14,.94);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;max-height:0;transition:max-height .2s cubic-bezier(.4,0,.2,1),opacity .15s ease,visibility .15s;opacity:0;visibility:hidden;pointer-events:none}
 .nav-dropdown.open{max-height:680px;opacity:1;visibility:visible;pointer-events:all}
 .menu-blur-overlay{position:fixed;inset:0;top:60px;z-index:249;background:rgba(8,8,15,.4);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .25s}
 .menu-blur-overlay.on{opacity:1;pointer-events:all}
