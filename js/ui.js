@@ -724,14 +724,9 @@ document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend
 
 // ── INICIALIZAÇÃO ──
 (function() {
-  const deepPages = ['settings','wallet','history','chat','plans','store','modules'];
-  const lastPage  = (() => { try { return sessionStorage.getItem('ghost_last_page'); } catch(_) { return null; } })();
-  const hashPage  = location.hash.replace('#','');
-  const hasTarget = lastPage || deepPages.includes(hashPage);
-  if (!hasTarget) {
-    try{history.replaceState({page:'home'},'',location.href);}catch(_){}
-    showPage('home',false);
-  }
+  try{history.replaceState({page:'home'},'',location.href);}catch(_){}
+  showPage('home',false);
+  // _loadSession é chamado pelo DOMContentLoaded em core.js
   setTimeout(function(){initDiscountBanner();},500);
 })();
 
