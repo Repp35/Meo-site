@@ -614,7 +614,8 @@ function showPage(id, pushHistory = true) {
   el.classList.add('active');
   el.style.animation = 'pageIn .22s ease both';
   window.scrollTo(0, 0);
-  try { sessionStorage.setItem('ghost_last_page', id); } catch(_) {}
+  const _restorablePages = ['settings','wallet','history','chat','plans','store','modules'];
+  try { if(_restorablePages.includes(id)) sessionStorage.setItem('ghost_last_page', id); else sessionStorage.removeItem('ghost_last_page'); } catch(_) {}
   const nav = document.getElementById('main-nav');
   const storeHero = document.getElementById('store-hero');
   if (id === 'home') nav.classList.remove('hidden');
@@ -1069,7 +1070,7 @@ document.addEventListener('DOMContentLoaded', function() {
         modules:  () => { pushNav('modules');   showPage('modules',  false); },
       };
       const fn = navMap[targetPage];
-      if (fn) fn();
+      if (fn) fn(); else showPage('home', false);
     });
   } else {
     _loadSession();
