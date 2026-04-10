@@ -317,20 +317,31 @@ function triggerAvatarUpload() {
   const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
   inp.onchange=e=>{
     const file=e.target.files[0]; if(!file)return;
+    const doUpload = async dataUrl => {
+      const avatarEl=document.querySelector('.settings-avatar');
+      if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');setTimeout(()=>avatarEl.classList.remove('avatar-swapping'),500);}
+      const res=await fetch(dataUrl); const blob=await res.blob();
+      window._avatarUploadError = null;
+      await setUserAvatar(currentUser.email, blob);
+      if(window._avatarUploadError) {
+        showToast('Erro ao salvar foto: ' + window._avatarUploadError, 'error');
+        return;
+      }
+      if(!currentUser.avatar_url) {
+        showToast('Erro ao salvar foto. Verifique bucket "avatars" no Supabase.', 'error');
+        return;
+      }
+      updateNavUser(); renderSettings();
+      showToast('Foto atualizada!');
+    };
     createImageBitmap(file).then(bmp=>{
       const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;
       c.getContext('2d').drawImage(bmp,0,0);
-      openCropper(c.toDataURL('image/jpeg',.95), async dataUrl=>{
-        const avatarEl=document.querySelector('.settings-avatar');
-        if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');setTimeout(()=>avatarEl.classList.remove('avatar-swapping'),500);}
-        const res=await fetch(dataUrl); const blob=await res.blob();
-        await setUserAvatar(currentUser.email,blob); updateNavUser(); renderSettings();
-      });
+      openCropper(c.toDataURL('image/jpeg',.95), doUpload);
     }).catch(()=>{
-      const r=new FileReader();r.onload=ev=>openCropper(ev.target.result,async dataUrl=>{
-        const res=await fetch(dataUrl); const blob=await res.blob();
-        await setUserAvatar(currentUser.email,blob); updateNavUser(); renderSettings();
-      });r.readAsDataURL(file);
+      const r=new FileReader();
+      r.onload=ev=>openCropper(ev.target.result, doUpload);
+      r.readAsDataURL(file);
     });
   }; inp.click();
 }
@@ -347,6 +358,14 @@ function removeAvatar() {
 }
 
 // HISTÓRICO + SETTINGS
+function showToast(msg, type='success') {
+  const t=document.createElement('div');
+  t.style.cssText=`position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${type==='error'?'#c0392b':'var(--p)'};color:#fff;padding:10px 20px;border-radius:99px;font-size:.82rem;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4);pointer-events:none;opacity:1;transition:opacity .4s`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),400);},3000);
+}
+
 function goHistory() { pushNav('history'); renderHistory(); showPage('history'); }
 function goSettings() { pushNav('settings'); renderSettings(); showPage('settings'); }
 function goUpgradePage() { goPlansFromResults(); closeMenu(); }
