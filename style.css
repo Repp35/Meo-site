@@ -70,30 +70,6 @@ nav.hidden{opacity:0;visibility:hidden;pointer-events:none}
 .nav-av-name{font-size:.75rem;font-weight:600;max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── NAV MENU ── */
-.nav-menu-btn{width:36px;height:36px;border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:1px solid var(--border);cursor:pointer;transition:all .15s}
-.nav-menu-btn:hover{border-color:var(--border2);background:rgba(255,255,255,.04)}
-.nav-menu-btn span{display:block;width:16px;height:1.5px;background:var(--muted2);transition:all .25s;border-radius:2px}
-.nav-menu-btn.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
-.nav-menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
-.nav-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
-/* ── MENU DRAWER (novo) ── */
-.menu-blur-overlay{display:none}
-.menu-blur-overlay.on{display:none}
-.nav-dropdown{position:fixed;top:0;right:0;bottom:0;width:78vw;max-width:300px;z-index:250;background:#0f0508;border-left:1px solid rgba(220,38,38,.25);transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);visibility:hidden;pointer-events:none;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-.nav-dropdown.open{transform:translateX(0);visibility:visible;pointer-events:auto}
-.nav-dropdown-inner{padding:20px 16px 32px;display:flex;flex-direction:column;min-height:100%}
-.nav-drop-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid rgba(220,38,38,.2)}
-.nav-drop-header-title{font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(220,38,38,.8)}
-.nav-drop-close{width:32px;height:32px;border-radius:.4rem;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.18);color:rgba(220,38,38,.7);transition:all .15s}
-.nav-drop-close:active{background:rgba(220,38,38,.18)}
-.nav-drop-items{display:flex;flex-direction:column;gap:4px;margin-bottom:20px}
-.nav-drop-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:.55rem;cursor:pointer;border:1px solid transparent;transition:background .15s,border-color .15s;-webkit-tap-highlight-color:transparent}
-.nav-drop-item:active{background:rgba(220,38,38,.12);border-color:rgba(220,38,38,.25)}
-.nav-drop-ico{width:34px;height:34px;border-radius:.45rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.2);color:#f87171}
-.nav-drop-name{font-size:.88rem;font-weight:600;color:#f0e8e8}
-.nav-drop-divider{height:1px;background:rgba(220,38,38,.15);margin-bottom:16px}
-.nav-drop-coupon{background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.18);border-radius:.55rem;padding:14px}
-.nav-drop-coupon-title{font-size:.73rem;font-weight:600;color:rgba(220,38,38,.7);margin-bottom:10px;display:flex;align-items:center;gap:7px}
 .coupon-input-wrap{display:flex;gap:8px}
 .coupon-input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;color:var(--fg);font-size:.82rem;font-family:inherit;transition:border-color .15s;text-transform:uppercase;letter-spacing:.05em}
 .coupon-input::placeholder{color:rgba(148,163,184,.25);text-transform:none;letter-spacing:0}
@@ -770,14 +746,6 @@ input::placeholder{color:rgba(148,163,184,.25)}
 .pc-price,.pc-price-free,.faq-a-inner,.rf .rf-val,.whois-raw,.pd-desc-text,.prod-price,
 .rc-card-label,.rc-fields,.rf,.rf-lbl,.rf-val,.res-count,.res-mod-name,.rc-section-label{
   -webkit-user-select:text;user-select:text
-}
-/* ════════════════════════════════════════════════════
-   ── BADGE NO MENU DROPDOWN ──
-════════════════════════════════════════════════════ */
-.nav-drop-badge {
-  font-size:.52rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-  background:rgba(74,222,128,.12);color:#4ade80;border:1px solid rgba(74,222,128,.25);
-  padding:2px 7px;border-radius:99px;margin-left:4px;vertical-align:middle;
 }
 
 /* ════════════════════════════════════════════════════
