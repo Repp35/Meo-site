@@ -615,7 +615,15 @@ function showPage(id, pushHistory = true) {
   el.style.animation = 'pageIn .22s ease both';
   window.scrollTo(0, 0);
   const _restorablePages = ['settings','wallet','history','chat','plans','store','modules'];
-  try { if(_restorablePages.includes(id)) sessionStorage.setItem('ghost_last_page', id); else sessionStorage.removeItem('ghost_last_page'); } catch(_) {}
+  try {
+    if(_restorablePages.includes(id)) {
+      sessionStorage.setItem('ghost_last_page', id);
+      sessionStorage.setItem('ghost_nav_active', '1');
+    } else {
+      sessionStorage.removeItem('ghost_last_page');
+      sessionStorage.removeItem('ghost_nav_active');
+    }
+  } catch(_) {}
   const nav = document.getElementById('main-nav');
   const storeHero = document.getElementById('store-hero');
   if (id === 'home') nav.classList.remove('hidden');
@@ -670,7 +678,7 @@ function updateCpfProCard() {
 }
 function goHome(){
   navHist=['home'];
-  try { sessionStorage.removeItem('ghost_last_page'); } catch(_) {}
+  try { sessionStorage.removeItem('ghost_last_page'); sessionStorage.removeItem('ghost_nav_active'); } catch(_) {}
   showPage('home');
   window.scrollTo({top:0, behavior:'smooth'});
   initDiscountBanner();
@@ -1012,14 +1020,19 @@ async function _doSaveProfile() {
 }
 
 // ── MODALS ──
-function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open'); document.body.style.overflow='hidden'; }
+function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open'); document.body.style.overflow='hidden'; window._overlayOpen = true; }
 function closeModal(id){
   const overlay = document.getElementById(id);
   const modal   = overlay?.querySelector('.modal');
   if (!overlay) return;
   overlay.classList.add('closing');
   if (modal) modal.classList.add('closing');
-  setTimeout(() => { overlay.classList.remove('open','closing'); if (modal) modal.classList.remove('closing'); document.body.style.overflow = ''; }, 200);
+  setTimeout(() => {
+    overlay.classList.remove('open','closing');
+    if (modal) modal.classList.remove('closing');
+    document.body.style.overflow = '';
+    if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) window._overlayOpen = false;
+  }, 200);
 }
 function closeAllModals(){
   document.querySelectorAll('.modal-overlay.open').forEach(m => {
@@ -1045,10 +1058,11 @@ document.addEventListener('DOMContentLoaded', function() {
   }));
 
   // ── RESTAURAR PÁGINA ──
-  // Se já estava no site (reload), sessionStorage tem a última página
-  // Se é primeira visita/aba nova, usa o hash da URL
+  // Só restaura se o usuário estava ativamente nessa página (flag ghost_nav_active)
+  // Se voltou pra home antes do reload, a flag foi limpa e não restaura
   const deepPages = ['settings','wallet','history','chat','plans','store','modules'];
-  const lastPage  = (() => { try { return sessionStorage.getItem('ghost_last_page'); } catch(_) { return null; } })();
+  const navActive = (() => { try { return sessionStorage.getItem('ghost_nav_active'); } catch(_) { return null; } })();
+  const lastPage  = navActive ? (() => { try { return sessionStorage.getItem('ghost_last_page'); } catch(_) { return null; } })() : null;
   const hashPage  = location.hash.replace('#','');
 
   const targetPage = lastPage || (deepPages.includes(hashPage) ? hashPage : null);
