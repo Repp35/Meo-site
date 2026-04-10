@@ -1027,7 +1027,7 @@ async function _doSaveProfile() {
 }
 
 // ── MODALS ──
-function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open'); document.body.classList.add('scroll-dimmed'); window._overlayOpen = true; }
+function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open');  window._overlayOpen = true; }
 function closeModal(id){
   const overlay = document.getElementById(id);
   const modal   = overlay?.querySelector('.modal');
@@ -1039,7 +1039,7 @@ function closeModal(id){
     if (modal) modal.classList.remove('closing');
     if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) {
       window._overlayOpen = false;
-      document.body.classList.remove('scroll-dimmed');
+      
     }
   }, 200);
 }
@@ -1233,7 +1233,7 @@ function toggleMenu() {
     btn?.classList.add('open'); storeBtn?.classList.add('open');
     dd.classList.add('open');
     document.getElementById('menuBlurOverlay').classList.add('on');
-    document.body.classList.add('scroll-dimmed');
+    
     closeAllPlanDetails(); // fecha detalhes ao abrir menu
   }
 }
@@ -1243,7 +1243,7 @@ function closeMenu() {
   document.getElementById('navDropdown')?.classList.remove('open');
   document.getElementById('menuBlurOverlay')?.classList.remove('on');
   if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) {
-    document.body.classList.remove('scroll-dimmed');
+    
   }
 }
 document.addEventListener('click', e => {
