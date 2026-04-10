@@ -64,6 +64,27 @@ const CHAT_MAX_PER_MIN   = 10;
   }, { passive: false });
 })();
 
+// ── TRAVAR SCROLL QUANDO OVERLAY ABERTO ──
+(function(){
+  function _anyOverlayOpen() {
+    return !!(
+      document.querySelector('.modal-overlay.open') ||
+      document.querySelector('.confirm-overlay.open') ||
+      document.querySelector('.csb-confirm-overlay.open') ||
+      document.getElementById('navDropdown')?.classList.contains('open')
+    );
+  }
+  document.addEventListener('touchmove', function(e) {
+    if (!_anyOverlayOpen()) return;
+    // permite scroll dentro do próprio modal/confirm (ex: modal de cadastro longo)
+    const modal = document.querySelector('.modal-overlay.open .modal') ||
+                  document.querySelector('.confirm-overlay.open .confirm-box') ||
+                  document.querySelector('.csb-confirm-overlay.open .csb-confirm-box');
+    if (modal && modal.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
+})();
+
 // ── SUPABASE ──
 const SUPABASE_URL  = 'https://wpdjetsomlvmlnkpkwja.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZGpldHNvbWx2bWxua3Brd2phIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTc3MTIsImV4cCI6MjA5MDMzMzcxMn0.Ggboop89c8yb8pSjIqBtFnUgjpf6jPT988qcAE8bBVA';
