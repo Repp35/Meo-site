@@ -1222,60 +1222,6 @@ window.addEventListener('popstate', e => {
   showPage(page, false);
 });
 
-// ── MENU ──
-function toggleMenu() {
-  const btn      = document.getElementById('menuBtn');
-  const storeBtn = document.getElementById('storeMenuBtn');
-  const dd       = document.getElementById('navDropdown');
-  const overlay  = document.getElementById('menuBlurOverlay');
-  const isOpen   = dd.classList.contains('open');
-  if (isOpen) closeMenu();
-  else {
-    btn?.classList.add('open'); storeBtn?.classList.add('open');
-    dd.classList.add('open');
-    overlay?.classList.add('on');
-    closeAllPlanDetails();
-    // impede touchmove de vazar pro body
-    if (!dd._touchLocked) {
-      dd._touchLocked = true;
-      dd.addEventListener('touchmove', e => e.stopPropagation(), {passive:true});
-    }
-
-    // DEBUG VISUAL
-    document.getElementById('__dbg')?.remove();
-    const box = document.createElement('div');
-    box.id = '__dbg';
-    box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#000;color:#0f0;font:11px monospace;padding:10px;white-space:pre-wrap;max-height:55vh;overflow-y:auto;border-bottom:2px solid #0f0';
-    document.body.appendChild(box);
-    function atualizaDbg() {
-      if (!document.getElementById('__dbg')) return;
-      const abertos = [...document.querySelectorAll('.open, .on')];
-      const overflow = document.body.style.overflow || '(ok)';
-      const pointerEvents = getComputedStyle(document.body).pointerEvents;
-      const linhas = abertos.map(el => {
-        const cs = getComputedStyle(el);
-        return `• ${el.id||'sem-id'} z:${cs.zIndex} pe:${cs.pointerEvents} pos:${cs.position}`;
-      });
-      box.textContent = `overflow:${overflow} | pointerEvents:${pointerEvents}\n\n${linhas.join('\n')}`;
-      setTimeout(atualizaDbg, 800);
-    }
-    atualizaDbg();
-  }
-}
-function closeMenu() {
-  document.getElementById('menuBtn')?.classList.remove('open');
-  document.getElementById('storeMenuBtn')?.classList.remove('open');
-  document.getElementById('navDropdown')?.classList.remove('open');
-  document.getElementById('menuBlurOverlay')?.classList.remove('on');
-
-
-}
-document.addEventListener('click', e => {
-  const btn      = document.getElementById('menuBtn');
-  const storeBtn = document.getElementById('storeMenuBtn');
-  const dd       = document.getElementById('navDropdown');
-  if (dd?.classList.contains('open') && !dd.contains(e.target) && !btn?.contains(e.target) && !storeBtn?.contains(e.target)) closeMenu();
-});
 
 // ── CUPOM ──
 // ── PLANOS E LIMITES ──
