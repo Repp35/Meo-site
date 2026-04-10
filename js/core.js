@@ -614,6 +614,7 @@ function showPage(id, pushHistory = true) {
   el.classList.add('active');
   el.style.animation = 'pageIn .22s ease both';
   window.scrollTo(0, 0);
+  try { sessionStorage.setItem('ghost_last_page', id); } catch(_) {}
   const nav = document.getElementById('main-nav');
   const storeHero = document.getElementById('store-hero');
   if (id === 'home') nav.classList.remove('hidden');
@@ -668,6 +669,7 @@ function updateCpfProCard() {
 }
 function goHome(){
   navHist=['home'];
+  try { sessionStorage.removeItem('ghost_last_page'); } catch(_) {}
   showPage('home');
   window.scrollTo({top:0, behavior:'smooth'});
   initDiscountBanner();
@@ -791,7 +793,6 @@ async function submitRegister(btn) {
     btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
     [nomeEl, emailEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
     clearModalErr(overlay);
-    showToast('Conta criada com sucesso!', 'success');
     _loadSession();
     setTimeout(() => showWelcomeCouponModal(), 600);
   }, 700);
@@ -867,7 +868,6 @@ async function submitLogin(btn) {
     btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
     [identEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
     clearModalErr(overlay);
-    showToast('Login realizado com sucesso!', 'success');
     await _loadSession();
   }, 700);
 }
@@ -1042,7 +1042,38 @@ function switchModal(a,b){ closeModal(a); setTimeout(()=>openModal(b),110); }
 // Binding de fechar modal ao clicar fora
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) closeAllModals(); }));
-  _loadSession();
+
+  // fechar confirm-overlay ao clicar fora
+  document.querySelectorAll('.confirm-overlay').forEach(o=>o.addEventListener('click',e=>{
+    if(e.target===o) o.classList.remove('open');
+  }));
+
+  // ── RESTAURAR PÁGINA ──
+  // Se já estava no site (reload), sessionStorage tem a última página
+  // Se é primeira visita/aba nova, usa o hash da URL
+  const deepPages = ['settings','wallet','history','chat','plans','store','modules'];
+  const lastPage  = (() => { try { return sessionStorage.getItem('ghost_last_page'); } catch(_) { return null; } })();
+  const hashPage  = location.hash.replace('#','');
+
+  const targetPage = lastPage || (deepPages.includes(hashPage) ? hashPage : null);
+
+  if (targetPage && targetPage !== 'home') {
+    _loadSession().then(() => {
+      const navMap = {
+        settings: () => { pushNav('settings');  renderSettings(); showPage('settings', false); },
+        wallet:   () => { pushNav('wallet');    renderWallet();   showPage('wallet',   false); },
+        history:  () => { pushNav('history');   renderHistory();  showPage('history',  false); },
+        chat:     () => goChat(),
+        plans:    () => { pushNav('plans');     showPage('plans',    false); },
+        store:    () => { pushNav('store');     showPage('store',    false); },
+        modules:  () => { pushNav('modules');   showPage('modules',  false); },
+      };
+      const fn = navMap[targetPage];
+      if (fn) fn();
+    });
+  } else {
+    _loadSession();
+  }
 });
 
 // ── CTA ──
