@@ -71,7 +71,7 @@ const CHAT_MAX_PER_MIN   = 10;
       window._overlayOpen ||
       document.querySelector('.modal-overlay.open') ||
       document.querySelector('.confirm-overlay.open') ||
-      document.querySelector('.csb-confirm-overlay.open') ||
+      document.querySelector('.csb-confirm-overlay.open')
     );
   }
 
