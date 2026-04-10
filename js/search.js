@@ -733,6 +733,7 @@ function renderResults(data){
     }
     html += `<div class="rc" style="animation-delay:${i*.07}s"><div class="rc-head"><div class="rc-card-label">${label}</div></div>${bodyHtml}</div>`;
   });
+  html += lockedFieldsBlock();
   html += upgradeBlock();
 
   // botão de download dos resultados (sem foto)
