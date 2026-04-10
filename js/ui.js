@@ -180,11 +180,14 @@ function initChatStatus() {
 
 // ── CUPOM DE BOAS-VINDAS ──
 function showWelcomeCouponModal() {
-  const el=document.getElementById('welcomeCouponModal'), title=document.getElementById('wcTitle'), sub=document.getElementById('wcSub'), btn=document.getElementById('wcBtn');
+  const el=document.getElementById('welcomeCouponModal');
+  const title=el?.querySelector('.wc-title');
+  const sub=el?.querySelector('.wc-sub');
+  const btn=el?.querySelector('.wc-btn');
   const isGuest=!currentUser||currentUser.anon;
   if(title)title.textContent=isGuest?'Oferta de boas-vindas':'Cupom ativado!';
   if(sub)sub.textContent=isGuest?'Cadastre-se agora e pague menos. Desconto aplicado automaticamente ao criar sua conta.':'Você ganhou desconto exclusivo de boas-vindas. Os preços já estão com o desconto aplicado para você.';
-  if(btn)btn.textContent=isGuest?'Criar conta grátis':'Aproveitar agora';
+  if(btn){btn.textContent=isGuest?'Criar conta grátis':'Aproveitar agora';btn.onclick=isGuest?wcBtnAction:closeWelcomeCouponModal;}
   if(el){ el.classList.add('open'); document.body.style.overflow='hidden'; }
   // fechar ao clicar fora
   if(el && !el._wcListener){
@@ -516,7 +519,7 @@ function _stopChatPoll() { clearInterval(_chatPollInterval); _chatPollInterval=n
 function goChat() {
   if(!currentUser||currentUser.anon){openModal('modal-login');return;}
   setTimeout(initChatStatus,80);
-  showThankYou('support',null);
+  _openChatPage();
 }
 
 async function _loadChatAdminAvatar() {
