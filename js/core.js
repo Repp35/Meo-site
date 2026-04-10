@@ -791,6 +791,7 @@ async function submitRegister(btn) {
     btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
     [nomeEl, emailEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
     clearModalErr(overlay);
+    showToast('Conta criada com sucesso!', 'success');
     _loadSession();
     setTimeout(() => showWelcomeCouponModal(), 600);
   }, 700);
@@ -866,6 +867,7 @@ async function submitLogin(btn) {
     btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
     [identEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
     clearModalErr(overlay);
+    showToast('Login realizado com sucesso!', 'success');
     await _loadSession();
   }, 700);
 }
