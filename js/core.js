@@ -1,28 +1,5 @@
 // GHOST BUSCA — Core (Auth, UI, Store, Wallet, Settings, History, Chat)
 
-// ── SCROLL LOCK (trava scroll sem bloquear cliques/toques) ──
-let _scrollLockCount = 0;
-function lockScroll() {
-  _scrollLockCount++;
-  if (_scrollLockCount > 1) return;
-  const sy = window.scrollY || window.pageYOffset;
-  document.body.style.position = 'fixed';
-  document.body.style.top = `-${sy}px`;
-  document.body.style.left = '0';
-  document.body.style.right = '0';
-  document.body.dataset.scrollY = sy;
-}
-function unlockScroll() {
-  _scrollLockCount = Math.max(0, _scrollLockCount - 1);
-  if (_scrollLockCount > 0) return;
-  const sy = parseInt(document.body.dataset.scrollY || '0', 10);
-  document.body.style.position = '';
-  document.body.style.top = '';
-  document.body.style.left = '';
-  document.body.style.right = '';
-  window.scrollTo(0, sy);
-}
-
 // ── ESTADO DO USUÁRIO ──
 let currentUser = null; // { name, email, plan }
 let queryCounters = {}; // { cpf: 3, nome: 1, ... }
@@ -1050,7 +1027,7 @@ async function _doSaveProfile() {
 }
 
 // ── MODALS ──
-function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open'); lockScroll(); window._overlayOpen = true; }
+function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open'); document.body.classList.add('scroll-dimmed'); window._overlayOpen = true; }
 function closeModal(id){
   const overlay = document.getElementById(id);
   const modal   = overlay?.querySelector('.modal');
@@ -1060,8 +1037,10 @@ function closeModal(id){
   setTimeout(() => {
     overlay.classList.remove('open','closing');
     if (modal) modal.classList.remove('closing');
-    unlockScroll();
-    if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) window._overlayOpen = false;
+    if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) {
+      window._overlayOpen = false;
+      document.body.classList.remove('scroll-dimmed');
+    }
   }, 200);
 }
 function closeAllModals(){
@@ -1071,8 +1050,9 @@ function closeAllModals(){
     setTimeout(() => { m.classList.remove('open','closing'); if (modal) modal.classList.remove('closing'); }, 200);
   });
   setTimeout(() => {
+    // só trava scroll se menu ainda estiver aberto
     if (!document.getElementById('navDropdown')?.classList.contains('open')) {
-      unlockScroll();
+      
     }
   }, 200);
 }
@@ -1253,7 +1233,7 @@ function toggleMenu() {
     btn?.classList.add('open'); storeBtn?.classList.add('open');
     dd.classList.add('open');
     document.getElementById('menuBlurOverlay').classList.add('on');
-    lockScroll();
+    document.body.classList.add('scroll-dimmed');
     closeAllPlanDetails(); // fecha detalhes ao abrir menu
   }
 }
@@ -1262,9 +1242,8 @@ function closeMenu() {
   document.getElementById('storeMenuBtn')?.classList.remove('open');
   document.getElementById('navDropdown')?.classList.remove('open');
   document.getElementById('menuBlurOverlay')?.classList.remove('on');
-  // só libera scroll se não há modal aberto
   if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) {
-    unlockScroll();
+    document.body.classList.remove('scroll-dimmed');
   }
 }
 document.addEventListener('click', e => {
