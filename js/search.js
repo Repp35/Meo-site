@@ -1,877 +1,891 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-<title>Ghost Busca</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
-<!-- Supabase SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
-<div id="splash"></div>
+// Se este arquivo quebrar, só a busca falha.
+// Auth, nav, store, wallet continuam funcionando.
 
-<!-- GHOST CURSOR -->
-<div id="ghost-cursor">
-  <svg width="22" height="26" viewBox="0 0 22 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M2 2L2 20L7 15L10 22L13 21L10 14L17 14L2 2Z" fill="url(#cg)" stroke="rgba(255,255,255,.15)" stroke-width="1" stroke-linejoin="round"/>
-    <defs>
-      <linearGradient id="cg" x1="2" y1="2" x2="17" y2="22" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#f472b6"/>
-        <stop offset="100%" stop-color="#a855f7"/>
-      </linearGradient>
-    </defs>
-  </svg>
-</div>
+try {
 
-<div id="noise-overlay"></div>
-<div class="dot-grid"></div>
-<canvas id="room3d"></canvas>
-<div id="hero-light"></div>
+// ── AUTO MASK ──
+function autoFmt(el) {
+  if(['ip','whois','nome','email','foto','familiares'].includes(curMod)) return;
 
-<!-- MODALS -->
-<div class="modal-overlay" id="modal-register">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('modal-register')">✕</button>
-    <div class="modal-logo"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C7.03 2 3 6.03 3 11v9l3-2 2 2 2-2 2 2 2-2 3 2v-9c0-4.97-4.03-9-9-9zm-3.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></span>Ghost<span class="modal-logo-dot">.</span>Busca</div>
-    <h2>Criar conta</h2>
-    <p class="modal-sub">Crie sua conta e comece a consultar agora.</p>
-    <div class="modal-field"><label class="modal-label">Nome</label><input class="modal-input" type="text" placeholder="Seu nome" autocomplete="name"></div>
-    <div class="modal-field"><label class="modal-label">E-mail ou usuário</label><input class="modal-input" id="reg-identifier" type="text" placeholder="seu@email.com ou nome" autocomplete="username"></div>
-    <div class="modal-field"><label class="modal-label">Senha</label>
-      <div class="modal-input-wrap">
-        <input class="modal-input" id="reg-pw" type="password" placeholder="Mínimo 5 caracteres" autocomplete="new-password">
-        <button class="modal-eye" onclick="togglePw('reg-pw','reg-eye')" id="reg-eye">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
+  // PIX: extrai números de qualquer texto colado, formata como CPF mascarado
+  if(curMod === 'pix') {
+    const digits = el.value.replace(/\D/g, '').slice(0, 6);
+    if(!digits) { el.value = ''; return; }
+    // posições fixas: sempre preenche do índice 3 ao 8 (meio do CPF)
+    // CPF: [0][1][2].[3][4][5].[6][7][8]-[9][10]
+    let c = ['*','*','*','*','*','*','*','*','*','*','*'];
+    for(let i = 0; i < digits.length; i++) c[3 + i] = digits[i];
+    el.value = c[0]+c[1]+c[2]+'.'+c[3]+c[4]+c[5]+'.'+c[6]+c[7]+c[8]+'-'+c[9]+c[10];
+    return;
+  }
+
+  let v = el.value.replace(/\D/g,'');
+  if(curMod==='cpf'||curMod==='cpfpro') {
+    if(v.length>11) v=v.slice(0,11);
+    v=v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})\.(\d{3})(\d)/,'$1.$2.$3').replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/,'$1.$2.$3-$4');
+  } else if(curMod==='cnpj') {
+    if(v.length>14) v=v.slice(0,14);
+    v=v.replace(/(\d{2})(\d)/,'$1.$2').replace(/(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/(\d{2})\.(\d{3})\.(\d{3})(\d)/,'$1.$2.$3/$4').replace(/(\d{4})(\d)/,'$1-$2');
+  } else if(curMod==='cep') {
+    if(v.length>8) v=v.slice(0,8);
+    v=v.replace(/(\d{5})(\d)/,'$1-$2');
+  } else if(curMod==='telefone') {
+    if(v.length>11) v=v.slice(0,11);
+    if(v.length<=10) v=v.replace(/(\d{2})(\d{4})(\d)/,'($1) $2-$3');
+    else v=v.replace(/(\d{2})(\d{5})(\d)/,'($1) $2-$3');
+  } else if(curMod==='placa') {
+    const u=el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,7);
+    el.value=u.length>3?u.slice(0,3)+'-'+u.slice(3):u; return;
+  } else if(curMod==='cnh') {
+    if(v.length>11) v=v.slice(0,11);
+  } else if(curMod==='cns') {
+    if(v.length>15) v=v.slice(0,15);
+    v=v.replace(/^(\d{3})(\d)/,'$1 $2')
+       .replace(/^(\d{3}) (\d{4})(\d)/,'$1 $2 $3')
+       .replace(/^(\d{3}) (\d{4}) (\d{4})(\d)/,'$1 $2 $3 $4');
+  } else if(curMod==='renavam') {
+    if(v.length>11) v=v.slice(0,11);
+    v=v.replace(/^(\d{10})(\d)/,'$1-$2');
+  }
+  el.value=v;
+}
+
+function shake() {
+  const i=document.getElementById('qInp');
+  i.style.borderColor='rgba(248,113,113,.6)';
+  i.animate([{transform:'translateX(0)'},{transform:'translateX(-5px)'},{transform:'translateX(5px)'},{transform:'translateX(0)'}],{duration:180});
+  setTimeout(()=>i.style.borderColor='',600);
+}
+
+// ── LOADING ──
+const STEPS={
+  cpf:    ['Validando CPF...','Buscando na base...','Montando resultado...'],
+  cpfpro: ['Validando CPF...','Buscando dados completos...','Montando resultado...'],
+  cnpj:   ['Validando CNPJ...','Consultando Receita...','Montando resultado...'],
+  cep:    ['Validando CEP...','Consultando APIs...','Mesclando dados...'],
+  ip:     ['Validando IP...','Geolocalização...','Dados de rede...'],
+  whois:  ['Analisando domínio...','Consultando RDAP...','Extraindo registro...'],
+  pix:    ['Validando chave...','Consultando Pix...','Montando resultado...'],
+};
+let _lastStepTime = 0;
+function stepSet(n,s){
+  const el=document.getElementById('ls'+n);
+  if(!el) return;
+  if(s==='done' && n < 3){
+    const now = Date.now();
+    const minGap = 400;
+    const wait = Math.max(0, _lastStepTime + minGap - now);
+    setTimeout(() => { el.className='ld-step '+s; _lastStepTime = Date.now(); }, wait);
+  } else {
+    el.className='ld-step '+s;
+    if(s==='on') _lastStepTime = Date.now();
+  }
+}
+function stepMsg(n,m){const el=document.getElementById('ls'+n+'t');if(el)el.textContent=m}
+function showLd(mod){
+  const msgs=STEPS[mod]||['Iniciando...','Consultando...','Finalizando...'];
+  [1,2,3].forEach(i=>{stepSet(i,'');stepMsg(i,msgs[i-1]||'...')});
+  document.getElementById('ld').classList.add('on');stepSet(1,'on');
+}
+function hideLd(){document.getElementById('ld').classList.remove('on')}
+
+// ── SAFE FETCH ──
+async function sf(url,opts={},ms=9000){
+  const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),ms);
+  try{const r=await fetch(url,{...opts,signal:ctrl.signal});clearTimeout(t);return r;}
+  catch{clearTimeout(t);return null;}
+}
+async function sfJSON(url,opts,ms){const r=await sf(url,opts,ms);if(!r||!r.ok)return null;try{return await r.json();}catch{return null;}}
+const CORS_PROXIES=[
+  u=>`https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+];
+async function proxyJSON(url){
+  for(const mk of CORS_PROXIES){
+    try{
+      const r=await sf(mk(url),{},8000);if(!r||!r.ok)continue;
+      const text=await r.text();let p;try{p=JSON.parse(text);}catch{continue;}
+      if(p?.contents!==undefined){try{return JSON.parse(p.contents);}catch{continue;}}
+      if(p&&typeof p==='object')return p;
+    }catch(_){}
+  }
+  return null;
+}
+
+// ── MOCK DATA ──
+const NO_DOUBLE = new Set(['whois','ip','cep','cnpj']);
+function getMock(mod, val) {
+  const N = 'Indisponível';
+  const mocks = {
+    cpf: {cpf:val||'000.000.000-00',nome:N,nascimento:N,idade:N,sexo:N,estado_civil:N,nacionalidade:N,naturalidade:N,signo:N,nome_mae:N,nome_pai:N,cnh:N,logradouro:N,numero:N,bairro:N,cidade:N,uf:N,cep:N,ibge:N,situacao_cadastral:N,titulo_eleitor:N},
+    cpfpro: {cpf:val||'000.000.000-00',nome:N,nascimento:N,idade:N,sexo:N,signo:N,estado_civil:N,empresario:N,cnpj:N,servidor_publico:N,cor_pele:N,cor_olhos:N,cor_cabelo:N,altura:N,pis:N,nacionalidade:N,naturalidade:N,aposentado:N,parto_gemelar:N,escolaridade:N,nome_mae:N,nome_pai:N,irmaos:N,cns_definitivo:N,cns_provisorio:N,nis_nit:N,titulo_eleitor:N,situacao_rf:N,situacao_cadastral:N,renda_atual:N,score_faixa:N,score_spc:N,vip_sus:N,vip_motivo:N,logradouro:N,numero:N,bairro:N,cidade:N,uf:N,cep:N,ibge:N,siafi:N,gia:N,ddd:N,coordenada:N,chassi:N,cnh:N,renavam:N,placa_nacional:N,placa_mercosul:N,ano_fabricacao:N,potencia:N,peso_bruto:N,capacidade_passageiros:N,telefone:N},
+    nome: {cpf:N,nome:val||N,nascimento:N,idade:N,sexo:N,estado_civil:N,nacionalidade:N,naturalidade:N,signo:N,nome_mae:N,nome_pai:N,cnh:N,logradouro:N,numero:N,bairro:N,cidade:N,uf:N,cep:N,ibge:N,situacao_cadastral:N,titulo_eleitor:N},
+    familiares:  {nome:N,cpf:N},
+    familiares2: {nome:N,cpf:N},
+    telefone: {formato_internacional:val||N,formato_nacional:N,formato_e164:N,numero_local:N,pais:N,codigo_iso:N,fuso_horario:N,operadora:N,status:N,nome:N,cpf:N,nascimento:N,sexo:N,estado_civil:N,logradouro:N,numero:N,bairro:N,cidade:N,uf:N,cep:N,regiao:N,latitude:N,longitude:N,google_maps:N},
+    email: {email:val||N,nome:N,cpf:N,nascimento:N,sexo:N,dominio:N,provedor:N,valido:N,descartavel:N,mx_valido:N,breaches:N,fontes:N,ultima_vez:N,logradouro:N,cidade:N,uf:N},
+    foto: {__foto:true,nome:N,cpf:val||N,estado_emissor:N,data_emissao:N},
+    placa: {placa_nacional:val||N,placa_mercosul:N,chassi:N,renavam:N,ano_fabricacao:N,potencia:N,peso_bruto:N,capacidade_passageiros:N,nome:N,cpf:N,nascimento:N,sexo:N,logradouro:N,numero:N,bairro:N,cidade:N,uf:N,cep:N},
+    cnh: {numero:val||N,nome:N,cpf:N,data_nascimento:N,categoria:N,data_validade:N,situacao:N,pontos:N},
+    cnpj: {cnpj:val||'00.000.000/0000-00',nome:N,nome_fantasia:N,razao_social:N,data_abertura:N,natureza_juridica:N,capital_social:N,porte:N,codigo_situacao:N,data_situacao:N,cnae_principal:N,cnae_secundarios:N,socios:N,telefones:N,emails:N,logradouro:N,numero:N,bairro:N,cidade:N,uf:N,cep:N,simples_nacional:N,data_opcao_simples:N,meio:N},
+    cep: {cep:val||'00000-000',logradouro:N,complemento:N,bairro:N,uf:N,ibge:N,gia:N,ddd:N,siafi:N,regiao:N,latitude:N,longitude:N},
+    cep_morador: {nome:N,cpf:N,nascimento:N,sexo:N,numero:N,bairro:N},
+    ip: {ip:val||N,hostname:N,tipo:N,isp:N,org:N,asn:N,pais:N,codigo_pais:N,regiao:N,cidade:N,cep:N,latitude:N,longitude:N,fuso_horario:N,proxy:N,vpn:N,tor:N,hosting:N},
+    pix: {cpf:val||N,nome:N,nascimento:N,idade:N,sexo:N,estado_civil:N,nacionalidade:N,naturalidade:N,signo:N,nome_mae:N,nome_pai:N,cnh:N,logradouro:N,numero:N,bairro:N,cidade:N,uf:N,cep:N,ibge:N,situacao_cadastral:N,titulo_eleitor:N},
+    cns: {cns_definitivo:val||N,cns_provisorio:N,nome:N,cpf:N,nascimento:N,sexo:N,nome_mae:N,nome_pai:N},
+    renavam: {renavam:val||N,placa_nacional:N,placa_mercosul:N,chassi:N,ano_fabricacao:N,potencia:N,peso_bruto:N,capacidade_passageiros:N,nome:N,cpf:N,nascimento:N,sexo:N,logradouro:N,numero:N,bairro:N,cidade:N,uf:N,cep:N},
+  };
+  const r = mocks[mod];
+  if (!r) return null;
+  return {...r};
+}
+
+// ── STUB ──
+async function searchStub(val){
+  stepSet(1,'on');
+  await new Promise(r=>setTimeout(r,600));
+  stepSet(1,'done'); stepSet(2,'on');
+  await new Promise(r=>setTimeout(r,550));
+  stepSet(2,'done');
+
+  const isGhost = activeCoupon?.type === 'ghost' || activeCoupon?.type === 'double';
+
+  // foto só funciona com ghost
+  if (curMod === 'foto') {
+    if (!isGhost) return null;
+  }
+
+  // familiares: só com ghost
+  if (curMod === 'familiares') {
+    if (!isGhost) return null;
+    const f1 = getMock('familiares', val);
+    const f2 = getMock('familiares2', val);
+    const result = f1 && f2 ? [f1, f2] : f1 ? [f1] : null;
+    if (activeCoupon?.type === 'double' && result) {
+      return [...result, ...result.map(r => ({...r, cpf: r.cpf ? '***.***.***-**' : undefined}))];
+    }
+    return result;
+  }
+
+  // cep tem API real — se chegou aqui no stub é porque a API falhou
+  if (curMod === 'cep') return null;
+
+  // todos os outros módulos sem API real: só retorna dados se ghost
+  if (!isGhost) return null;
+
+  const mock = getMock(curMod, val);
+  if (!mock) return null;
+  if (activeCoupon?.type === 'double' && !NO_DOUBLE.has(curMod)) {
+    const mock2 = getMock(curMod, val);
+    if (mock2?.cpf !== undefined) mock2.cpf = '***.***.***-**';
+    return [mock, mock2];
+  }
+  return [mock];
+}
+
+// ── CPF ──
+function nCPF(raw, n) {
+  if (!raw || typeof raw !== 'object') return null;
+  const g = (...ks) => { for (const k of ks) { const v = raw[k]; if (v && String(v).trim() && String(v).trim() !== '0' && String(v).trim() !== 'null') return String(v); } return null; };
+  const nome = g('nome','NOME','name','nm_pessoa'); if (!nome) return null;
+  // formata data de nascimento
+  let nasc = g('data_nascimento','nascimento','NASC','birthdate');
+  if (nasc && nasc.includes('-')) {
+    const [y,m,d] = nasc.split('-');
+    nasc = `${d}/${m}/${y}`;
+  }
+  // mapeia genero
+  const gen = g('genero','sexo','SEXO','gender');
+  const sexo = gen === 'M' ? 'Masculino' : gen === 'F' ? 'Feminino' : gen;
+  const o = { nome, cpf: n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'), nascimento: nasc, sexo, nome_mae: g('nome_mae','mae','MAE','nm_mae','mother'), nome_pai: g('nome_pai','pai','PAI','nm_pai','father'), situacao: g('situacao','SITUACAO','status'), titulo_eleitor: g('titulo_eleitor','titulo'), renda: g('renda'), pis: g('pis','PIS'), email: g('email','EMAIL'), telefone: g('telefone','celular','phone'), logradouro: g('logradouro','LOGRADOURO'), numero: g('numero','NUMERO'), bairro: g('bairro','BAIRRO'), cidade: g('cidade','MUNICIPIO'), uf: g('uf','UF'), cep_end: g('cep','CEP') };
+  Object.keys(o).forEach(k => { if (!o[k]) delete o[k]; }); return o;
+}
+async function searchCPF(cpf) {
+  const n = cpf.replace(/\D/g, ''); if (n.length !== 11) return null;
+  const KEY = '55c9476b357b8404a427ad090909c2f08fa485f84e4c78cb13545a5c6564455e';
+  stepSet(1, 'on');
+
+  // tenta direto (funciona se a API tiver CORS liberado)
+  let raw = await sfJSON(`https://apicpf.com/api/consulta?cpf=${n}`, { headers: {'X-API-KEY': KEY, 'Accept': 'application/json'} });
+  if (raw) { const d = raw.data || raw.resultado || raw; const nm = nCPF(d, n); if (nm) { stepSet(1,'done'); stepSet(2,'done'); return [nm]; } }
+
+  stepSet(1,'done'); stepSet(2,'on');
+
+  // fallback: proxy com key na URL
+  raw = await proxyJSON(`https://apicpf.com/api/consulta?cpf=${n}&key=${KEY}`);
+  if (raw) { const d = raw.data || raw.resultado || raw; const nm = nCPF(d, n); if (nm) { stepSet(2,'done'); return [nm]; } }
+
+  stepSet(2,'done'); return null;
+}
+
+// ── CNPJ ──
+function nCNPJ(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const g = (...ks) => { for (const k of ks) { const v = raw[k]; if (v && String(v).trim() && String(v).trim() !== '0') return String(v); } return null; };
+  const razao = g('razao_social','nome','company_name','nome_empresarial'); if (!razao) return null;
+  let socios = null; const qsa = raw.qsa || raw.QSA || raw.socios || [];
+  if (Array.isArray(qsa) && qsa.length) socios = qsa.map(s => s.nome || s.name || '').filter(Boolean).join(' · ');
+  let tel = g('telefone','ddd_telefone_1','fone');
+  if (!tel) { const tls = raw.telefones || []; if (Array.isArray(tls) && tls.length) tel = tls.map(t => t.ddd ? `(${t.ddd}) ${t.numero}` : t).join(' / '); }
+  const logr = g('logradouro','street'); const num = g('numero');
+  const end = [logr, num && num !== 'S/N' ? num : null].filter(Boolean).join(', ');
+  const o = { razao_social: razao, nome_fantasia: g('nome_fantasia','fantasia'), cnpj: (g('cnpj','CNPJ','document') || '').replace(/\D/g,'').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'), situacao: g('situacao_cadastral','situacao','status'), data_abertura: g('data_inicio_atividade','data_abertura','abertura'), porte: g('porte','porte_empresa'), capital_social: g('capital_social','capital'), natureza_juridica: g('natureza_juridica'), tipo: g('matriz_filial','tipo'), logradouro: end || null, complemento: g('complemento'), bairro: g('bairro'), cidade: g('municipio','cidade'), uf: g('uf'), cep: g('cep','CEP'), email: g('email','EMAIL','correio_eletronico'), telefone: tel, simples: raw.opcao_simples === 'S' || raw.simples === true ? 'Sim' : raw.opcao_simples === 'N' || raw.simples === false ? 'Não' : null, mei: raw.opcao_mei === 'S' || raw.mei === true ? 'Sim' : null, atividade: g('cnae_fiscal_descricao','atividade_principal'), socios };
+  Object.keys(o).forEach(k => { if (!o[k]) delete o[k]; }); return o;
+}
+async function searchCNPJ(cnpj) {
+  const n = cnpj.replace(/\D/g, ''); if (n.length !== 14) return null;
+  const tf = async url => { const d = await sfJSON(url); return d ? nCNPJ(d) : null; };
+  stepSet(1,'on');
+  const r1 = await tf(`https://brasilapi.com.br/api/cnpj/v1/${n}`); if (r1) { stepSet(1,'done'); stepSet(2,'done'); return [r1]; }
+  stepSet(1,'done'); stepSet(2,'on');
+  const r2 = await tf(`https://publica.cnpj.ws/cnpj/${n}`); if (r2) { stepSet(2,'done'); return [r2]; }
+  const r3 = await tf(`https://minhareceita.org/${n}`); if (r3) { stepSet(2,'done'); return [r3]; }
+  stepSet(2,'done'); return null;
+}
+
+// ── CEP ──
+async function searchCEP(cep) {
+  const n = cep.replace(/\D/g, ''); if (n.length !== 8) return null;
+  stepSet(1,'on');
+  const all = await Promise.allSettled([
+    sfJSON(`https://viacep.com.br/ws/${n}/json/`),
+    sfJSON(`https://brasilapi.com.br/api/cep/v2/${n}`),
+    sfJSON(`https://cep.awesomeapi.com.br/json/${n}`),
+    sfJSON(`https://opencep.com/v1/${n}`),
+  ]);
+  stepSet(1,'done'); stepSet(2,'on');
+  let m = {};
+  all.forEach(res => { if (res.status === 'fulfilled' && res.value && !res.value.erro && !res.value.message && !res.value.name) m = {...m, ...res.value}; });
+  stepSet(2,'done');
+  if (!m.logradouro && !m.street && !m.address) return null;
+  const lat = m.location?.coordinates?.latitude || m.lat || null;
+  const lng = m.location?.coordinates?.longitude || m.lng || null;
+  const maps = lat && lng ? `<a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener">Abrir no Maps ↗</a>` : null;
+  const o = { _type:'cep_info', cep: n.replace(/(\d{5})(\d{3})/, '$1-$2'), logradouro: m.logradouro || m.street || m.address || null, tipo: m.address_type || m.tipo || null, complemento: m.complemento || null, bairro: m.bairro || m.neighborhood || m.district || null, cidade: m.localidade || m.city || null, estado: m.estado || m.state || null, uf: m.uf || null, regiao: m.regiao || null, ddd: m.ddd || null, ibge: m.ibge || m.city_ibge || null, gia: m.gia || null, siafi: m.siafi || null, latitude: lat ? String(lat) : null, longitude: lng ? String(lng) : null, google_maps: maps };
+  Object.keys(o).forEach(k => { if (!o[k] && k !== '_type') delete o[k]; });
+  const moradores = (m.moradores || m.residents || []).map((r,idx) => ({
+    _type:'cep_morador', _idx: idx+1,
+    nome: r.nome||null, cpf: r.cpf||null, nascimento: r.nascimento||null,
+    sexo: r.sexo||null, numero: r.numero||null, bairro: r.bairro||null
+  })).filter(r => r.nome || r.cpf);
+  return [o, ...moradores];
+}
+
+// IP
+async function searchIP(ip) {
+  const t = ip.trim();
+  const fi = d => ({ip:d.ip||t,tipo:d.type||null,cidade:d.city||null,regiao:d.region||null,pais:`${d.country||''} (${d.country_code||''})`,continente:d.continent||null,latitude:d.latitude?String(d.latitude):null,longitude:d.longitude?String(d.longitude):null,timezone:d.timezone?.id||null,provedor:d.connection?.isp||null,org:d.connection?.org||null,asn:d.connection?.asn?`AS${d.connection.asn}`:null});
+  const fa = d => ({ip:d.ip||t,hostname:d.hostname||null,cidade:d.city||null,regiao:d.region||null,pais:`${d.country_name||''} (${d.country||''})`,continente:d.continent_code||null,latitude:d.latitude?String(d.latitude):null,longitude:d.longitude?String(d.longitude):null,timezone:d.timezone||null,provedor:d.org||null,asn:d.asn||null,proxy_vpn:d.proxy?'Sim':'Não'});
+  const cl = o => { Object.keys(o).forEach(k => { if (!o[k]) delete o[k]; }); return o; };
+  stepSet(1,'on');
+  let d = await sfJSON(`https://ipwho.is/${t}`); if (d?.success) { stepSet(1,'done'); stepSet(2,'done'); return [cl(fi(d))]; }
+  d = await sfJSON(`https://freeipapi.com/api/json/${t}`); if (d?.ipAddress) { stepSet(1,'done'); stepSet(2,'done'); return [cl({ip:d.ipAddress||t,cidade:d.cityName||null,regiao:d.regionName||null,pais:`${d.countryName||''} (${d.countryCode||''})`,latitude:d.latitude?String(d.latitude):null,longitude:d.longitude?String(d.longitude):null,timezone:d.timeZone||null})]; }
+  d = await sfJSON(`https://ipapi.co/${t}/json/`); if (d && !d.error && !d.reason) { stepSet(1,'done'); stepSet(2,'done'); return [cl(fa(d))]; }
+  stepSet(1,'done'); stepSet(2,'on');
+  d = await proxyJSON(`https://ipwho.is/${t}`); if (d?.success) { stepSet(2,'done'); return [cl(fi(d))]; }
+  d = await proxyJSON(`https://ipapi.co/${t}/json/`); if (d && !d.error && !d.reason) { stepSet(2,'done'); return [cl(fa(d))]; }
+  stepSet(2,'done'); return null;
+}
+
+// ── WHOIS ──
+function normWhoisObj(raw, domain) {
+  const g = (...ks) => { for (const k of ks) { const v = raw[k]; if (v && String(v).trim() && String(v).trim() !== 'REDACTED FOR PRIVACY') return String(v).trim(); } return null; };
+  const ns = raw.name_servers || raw.nameservers || [];
+  const nsArr = Array.isArray(ns) ? ns.map(n => typeof n === 'string' ? n : (n.name || n.ldhName || '')).filter(Boolean) : [];
+  const statusArr = Array.isArray(raw.status) ? raw.status : (raw.status ? [raw.status] : []);
+  const reg = raw.registrant || raw.contacts?.registrant || {};
+  return { domain_name: (g('domain_name','domain','ldhName') || domain || '').toUpperCase(), registry_id: g('domain_id','registry_domain_id'), registrar: g('registrar','registrar_name'), registrar_url: g('registrar_url'), registrar_iana: g('registrar_iana_id'), whois_server: g('registrar_whois_server','whois_server'), creation_date: g('creation_date','created_date','created'), updated_date: g('updated_date','update_date'), expiration_date: g('expiration_date','expires_date','expiry_date'), status: statusArr.join(' | ') || null, registrant_org: g('registrant_organization') || reg.organization || null, registrant_country: g('registrant_country') || reg.country || null, registrant_email: g('registrant_email') || reg.email || null, nameservers: nsArr.join(', ') || null, dnssec: g('dnssec') || (raw.secureDNS?.delegationSigned ? 'signedDelegation' : 'unsigned') };
+}
+function normRDAP(raw, domain) {
+  const ev = a => raw.events?.find(e => e.eventAction === a)?.eventDate || null;
+  const reg = raw.entities?.find(e => e.roles?.includes('registrar'));
+  const ns = raw.nameservers?.map(n => n.ldhName).filter(Boolean) || [];
+  return { domain_name: (raw.ldhName || domain || '').toUpperCase(), registrar: reg?.vcardArray?.[1]?.find(x => x[0] === 'fn')?.[3] || null, creation_date: ev('registration'), updated_date: ev('last changed'), expiration_date: ev('expiration'), status: Array.isArray(raw.status) ? raw.status.slice(0,4).join(' | ') : null, nameservers: ns.join(', ') || null, dnssec: raw.secureDNS?.delegationSigned ? 'signedDelegation' : 'unsigned' };
+}
+function mergeW(a, b) { const o = {...a}; for (const k of Object.keys(b)) { if (!o[k] && b[k]) o[k] = b[k]; } return o; }
+function dictToText(d) {
+  const LABELS = { domain_name:'Domain Name', registry_id:'Registry Domain ID', registrar:'Registrar', registrar_url:'Registrar URL', registrar_iana:'Registrar IANA ID', whois_server:'Registrar WHOIS Server', creation_date:'Creation Date', updated_date:'Updated Date', expiration_date:'Expiration Date', status:'Domain Status', registrant_org:'Registrant Organization', registrant_country:'Registrant Country', registrant_email:'Registrant Email', tech_email:'Tech Email', nameservers:'Name Server', dnssec:'DNSSEC' };
+  const lines = [];
+  for (const [k, label] of Object.entries(LABELS)) { const v = d[k]; if (!v) continue; if (k === 'nameservers') { v.split(', ').forEach(ns => lines.push(`${label}: ${ns.trim().toUpperCase()}`)); } else if (k === 'status') { v.split(' | ').forEach(s => lines.push(`${label}: ${s.trim()}`)); } else { lines.push(`${label}: ${v}`); } }
+  return lines.join('\n');
+}
+async function searchWHOIS(domain) {
+  const d = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  let merged = {};
+  stepSet(1,'on');
+  try { const raw = await sfJSON(`https://who-dat.as93.net/${d}`); if (raw && !raw.error && (raw.domain_name || raw.creation_date)) merged = mergeW(merged, normWhoisObj(raw, d)); } catch (_) {}
+  if (!merged.domain_name) { try { const raw = await proxyJSON(`https://who-dat.as93.net/${d}`); if (raw && !raw.error && (raw.domain_name || raw.creation_date)) merged = mergeW(merged, normWhoisObj(raw, d)); } catch (_) {} }
+  stepSet(1,'done'); stepSet(2,'on');
+  try { const raw = await sfJSON(`https://rdap.org/domain/${d}`); if (raw && (raw.ldhName || raw.events?.length)) merged = mergeW(merged, normRDAP(raw, d)); } catch (_) {}
+  if (!merged.creation_date) { try { const raw = await proxyJSON(`https://rdap.org/domain/${d}`); if (raw && (raw.ldhName || raw.events?.length)) merged = mergeW(merged, normRDAP(raw, d)); } catch (_) {} }
+  try { const tld = d.split('.').pop(); const base = tld === 'net' ? 'https://rdap.verisign.com/net/v1' : 'https://rdap.verisign.com/com/v1'; const raw = await sfJSON(`${base}/domain/${d}`); if (raw?.ldhName || raw?.events?.length) merged = mergeW(merged, normRDAP(raw, d)); } catch (_) {}
+  stepSet(2,'done');
+  const hasData = merged.domain_name || merged.creation_date || merged.registrar || merged.nameservers;
+  if (!hasData) return null;
+  Object.keys(merged).forEach(k => { if (!merged[k]) delete merged[k]; });
+  const text = dictToText(merged); if (!text) return null;
+  return [{ __whois_raw: text, dominio: d }];
+}
+
+// ── PIX CPF ──
+async function searchPix(val) {
+  // extrai os dígitos conhecidos da máscara
+  const digits = val.replace(/[^0-9]/g, '');
+  if (digits.length < 4) return null;
+
+  stepSet(1,'on');
+  await new Promise(r=>setTimeout(r,500));
+  stepSet(1,'done'); stepSet(2,'on');
+  await new Promise(r=>setTimeout(r,500));
+  stepSet(2,'done');
+
+  const N = 'Indisponível';
+  return [{
+    cpf: val.trim(),
+    nome: N, nascimento: N, nome_mae: N, nome_pai: N, avo: N,
+    nis_nit: N, rg: N, cnh: N,
+    logradouro: N, numero: N, bairro: N, cidade: N, uf: N, cep: N,
+    telefone: N, email: N, situacao: N, titulo_eleitor: N,
+  }];
+}
+const MOD_MIN_LEN = {
+  cpf:9, cpfpro:9, cnpj:14, cep:8, placa:7, cnh:11, telefone:9, cns:15, renavam:9,
+};
+
+// PARSE CPF PARCIAL (Pix)
+function parseCpfParcial(val) {
+  // extrai só dígitos e asteriscos/pontos/traços
+  // exemplos aceitos: ***.723.262-**, .723.262-, 723.262, 723262
+  const clean = val.replace(/[^0-9*xX]/g, ''); // mantém dígitos e *
+  const digits = val.replace(/[^0-9]/g, '');    // só dígitos
+
+  // precisa ter pelo menos 4 dígitos consecutivos pra buscar
+  if (digits.length < 4) return null;
+
+  // monta padrão de busca — substitui * e posições desconhecidas por '?'
+  // normaliza para 11 chars onde desconhecido = '?'
+  let pattern = '';
+  let di = 0;
+  for (let i = 0; i < 11; i++) {
+    if (di < clean.length) {
+      const c = clean[di];
+      if (c === '*' || c === 'x' || c === 'X') { pattern += '?'; di++; }
+      else if (/\d/.test(c)) { pattern += c; di++; }
+      else pattern += '?';
+    } else {
+      pattern += '?';
+    }
+  }
+  return { pattern, knownDigits: digits };
+}
+
+function validateInput(mod, val) {
+  if (mod === 'pix') {
+    const digits = val.replace(/[^0-9]/g, '');
+    return digits.length >= 4 && digits.length <= 6;
+  }
+  if (mod === 'placa') {
+    const p = val.replace(/[^a-zA-Z0-9]/g,'');
+    return p.length >= 7;
+  }
+  const clean = val.replace(/\D/g,'');
+  const min   = MOD_MIN_LEN[mod];
+  if (min && clean.length < min) return false;
+  if (['nome','email','foto','ip','whois','familiares','cns'].includes(mod) && val.trim().length < 3) return false;
+  return true;
+}
+
+// ── SEARCH ROUTER ──
+function _handlePermissionDenied(perm) {
+  const mod     = curMod;
+  const modName = MODS[mod]?.name || mod;
+  const cost    = MOD_CREDITS[mod] || 0;
+  const priceStr = cost > 0 ? fmtBrl(creditsToReal(cost)) : null;
+
+  if (perm.reason === 'login') {
+    renderErr('Login necessário','Crie uma conta gratuitamente para consultar.');
+    pushNav('results'); showPage('results'); return;
+  }
+
+  if (perm.reason === 'credits-only') {
+    if (canUseCredits(mod)) { askUseCredits(); return; }
+    showUnlockModal(mod, 'credits-only'); return;
+  }
+  if (perm.reason === 'upgrade') {
+    showUnlockModal(mod, 'upgrade'); return;
+  }
+
+  // limit — mod_limit ou total_limit
+  if (canUseCredits(mod)) { askUseCredits(); return; }
+
+  const isTotalLimit = perm.reason === 'total_limit';
+  const el = document.getElementById('modalUnlockContent');
+  const resetMsg = (() => {
+    const now  = new Date();
+    const meia = new Date(now); meia.setHours(24,0,0,0);
+    const diff = meia - now;
+    const hh   = Math.floor(diff / 3600000);
+    const mm   = Math.floor((diff % 3600000) / 60000);
+    return hh > 0 ? `${hh}h ${mm}min` : `${mm}min`;
+  })();
+
+  el.innerHTML = `
+    <div style="margin-bottom:10px;color:var(--muted)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></div>
+    <h3 style="font-size:1rem;font-weight:700;margin-bottom:8px">Acabaram suas consultas diárias</h3>
+    <p style="font-size:.8rem;color:var(--muted);line-height:1.6;margin-bottom:6px">${
+      isTotalLimit
+        ? `Você atingiu o limite total do dia. ${priceStr ? `Continue agora por apenas ${priceStr} por consulta de ${modName}.` : ''}`
+        : `Você esgotou as consultas de ${modName} de hoje. ${priceStr ? `Continue por apenas ${priceStr}.` : ''}`
+    }</p>
+    <p style="font-size:.72rem;color:var(--muted);margin-bottom:20px">↺ Novas consultas em ${resetMsg}</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${cost > 0 ? `<button class="credits-buy-btn" onclick="document.getElementById('modalUnlock').classList.remove('open');goCredits('${mod}')">
+        <svg width="13" height="13" viewBox="0 0 20 24" fill="none"><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="#fff" stroke-width="3" stroke-linecap="square"/></svg>
+        Comprar consultas avulsas
+      </button>` : ''}
+      <button onclick="document.getElementById('modalUnlock').classList.remove('open');goPlansFromResults()" style="width:100%;padding:11px;border-radius:var(--r);font-size:.85rem;font-weight:600;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted2);transition:all .15s">Ver planos</button>
+      <button onclick="document.getElementById('modalUnlock').classList.remove('open')" style="font-size:.75rem;color:var(--muted);padding:6px" onmouseover="this.style.color='var(--fg)'" onmouseout="this.style.color='var(--muted)'">Voltar amanhã</button>
+    </div>`;
+  document.getElementById('modalUnlock').classList.add('open');
+}
+
+async function doSearch(){
+  const val = document.getElementById('qInp').value.trim();
+  if (!val) { shake(); return; }
+  if (!validateInput(curMod, val)) { shake(); return; }
+
+  // cupom ghost/double bypassa todas as restrições
+  const isGhost = activeCoupon?.type === 'ghost' || activeCoupon?.type === 'double';
+  if (isGhost) { await _runSearch(); return; }
+
+  const perm = canQuery(curMod);
+
+  if (!perm.ok) {
+    _handlePermissionDenied(perm);
+    return;
+  }
+
+  // tem consultas — pergunta créditos só se módulo premium ou poucos restantes
+  const cost = MOD_CREDITS[curMod] || 0;
+  const left = perm.left != null ? perm.left : Infinity;
+  const isPremiumMod = PREMIUM_MODS.has(curMod);
+  const isLow = left !== Infinity && left <= CREDITS_LOW_THRESHOLD;
+
+  if (cost > 0 && canUseCredits(curMod) && (isPremiumMod || isLow)) {
+    askUseCredits(true);
+    return;
+  }
+
+  await _runSearch();
+}
+
+async function _runSearch(useCredits = false) {
+  const val = document.getElementById('qInp').value.trim();
+  showLd(curMod);
+  const t0 = Date.now();
+  const MIN_MS = 900;
+  try{
+    let res;
+    const isGhost = activeCoupon?.type === 'ghost' || activeCoupon?.type === 'double';
+    if (!isGhost && (curMod==='cpf'||curMod==='cpfpro')) res=await searchCPF(val);
+    else if(!isGhost && curMod==='cnpj')  res=await searchCNPJ(val);
+    else if(!isGhost && curMod==='cep')   res=await searchCEP(val);
+    else if(!isGhost && curMod==='ip')    res=await searchIP(val);
+    else if(!isGhost && curMod==='whois') res=await searchWHOIS(val);
+    else if(!isGhost && curMod==='pix')   res=await searchPix(val);
+    else res=await searchStub(val);
+    const elapsed = Date.now() - t0;
+    if (elapsed < MIN_MS) await new Promise(r => setTimeout(r, MIN_MS - elapsed));
+    if (res && res.length > 0) {
+      if (useCredits) { spendCredits(curMod); playCreditsAnimation(); }
+      else incrementCounter(curMod);
+      const cost = MOD_CREDITS[curMod] || 0;
+      histAdd({ type:'consulta', name:`${MODS[curMod]?.name || curMod} — ${val}`, free: cost === 0 || !useCredits, value: useCredits ? creditsToReal(cost).toFixed(2) : null });
+    }
+    stepSet(3,'done'); hideLd(); pushNav('results'); renderResults(res);
+    updateResultsBanner(curMod);
+  }catch(e){ hideLd(); renderErr('Erro inesperado','Verifique sua conexão e tente novamente.'); }
+}
+
+// ── UPGRADE BLOCK ──
+// ── CAMPOS BLOQUEADOS POR MÓDULO ──
+const LOCKED_FIELDS = {
+  cpf: {
+    title: 'Disponível no CPF Pro',
+    plan: 'starter',
+    fields: [
+      {lbl:'Sexo',          val:'M / F'},
+      {lbl:'Raça/Cor',      val:'████'},
+      {lbl:'Signo',         val:'████'},
+      {lbl:'Tipo Sanguíneo',val:'████'},
+      {lbl:'CNS Definitivo',val:'████'},
+      {lbl:'Score SPC',     val:'███'},
+      {lbl:'Renda Estimada',val:'R$ ████'},
+      {lbl:'Escolaridade',  val:'████'},
+      {lbl:'Estado Civil',  val:'████'},
+      {lbl:'Bolsa Família', val:'████'},
+      {lbl:'Empresário',    val:'████'},
+      {lbl:'Classe Social', val:'████'},
+    ]
+  },
+  nome: {
+    title: 'Disponível no CPF Pro',
+    plan: 'starter',
+    fields: [
+      {lbl:'Score SPC',     val:'███'},
+      {lbl:'Renda Estimada',val:'R$ ████'},
+      {lbl:'Estado Civil',  val:'████'},
+      {lbl:'Bolsa Família', val:'████'},
+      {lbl:'Tipo Sanguíneo',val:'████'},
+      {lbl:'Escolaridade',  val:'████'},
+    ]
+  },
+  pix: {
+    title: 'Disponível no CPF Pro',
+    plan: 'starter',
+    fields: [
+      {lbl:'Score SPC',     val:'███'},
+      {lbl:'Banco',         val:'████'},
+      {lbl:'Tipo Conta',    val:'████'},
+      {lbl:'Renda Estimada',val:'R$ ████'},
+      {lbl:'Estado Civil',  val:'████'},
+      {lbl:'Bolsa Família', val:'████'},
+    ]
+  },
+  telefone: {
+    title: 'Mais dados disponíveis',
+    plan: 'starter',
+    fields: [
+      {lbl:'WhatsApp',      val:'████'},
+      {lbl:'Outros números',val:'████'},
+      {lbl:'Emails',        val:'████'},
+      {lbl:'CPF Vinculado', val:'███.***.***-**'},
+      {lbl:'Endereço',      val:'████'},
+    ]
+  },
+  placa: {
+    title: 'Dados avançados do veículo',
+    plan: 'pro',
+    fields: [
+      {lbl:'Multas',        val:'████'},
+      {lbl:'Proprietário',  val:'████'},
+      {lbl:'CPF Dono',      val:'███.***.***-**'},
+      {lbl:'Histórico',     val:'████'},
+      {lbl:'Leilão',        val:'████'},
+    ]
+  },
+};
+
+function lockedFieldsBlock() {
+  const plan     = currentUser?.plan || 'basico';
+  const planOrder= ['basico','starter','pro','premium'];
+  const planIdx  = planOrder.indexOf(plan);
+  const locked   = LOCKED_FIELDS[curMod];
+  if (!locked) return '';
+
+  // só mostra se o usuário não tem o plano necessário
+  const requiredIdx = planOrder.indexOf(locked.plan);
+  if (planIdx >= requiredIdx) return '';
+
+  const planLabel = locked.plan === 'starter' ? 'Starter' : 'Pro';
+  const fields = locked.fields.map(f => `
+    <div class="rc-locked-field" onclick="goPlansFromResults()">
+      <span class="rc-locked-ico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+      <span class="rc-locked-lbl">${f.lbl}</span>
+      <span class="rc-locked-val">${f.val}</span>
+    </div>`).join('');
+
+  return `
+    <div class="rc-locked-section">
+      <div class="rc-locked-title">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        ${locked.title} · <span style="color:var(--p3);cursor:pointer" onclick="goPlansFromResults()">Assinar ${planLabel} →</span>
       </div>
-    </div>
-    <button class="modal-submit" onclick="submitRegister(this)">Criar conta</button>
-    <div class="modal-hint" style="margin-top:12px;display:flex;align-items:flex-start;gap:8px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;color:var(--p)"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span><strong>Dica:</strong> não use a mesma senha que você usa em outros sites ou redes sociais.</span></div>
-    <div class="modal-footer">Já tem uma conta? <a onclick="switchModal('modal-register','modal-login')">Entrar</a></div>
-  </div>
-</div>
-<div class="modal-overlay" id="modal-login">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('modal-login')">✕</button>
-    <div class="modal-logo"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7.03 2 3 6.03 3 11v9l3-2 2 2 2-2 2 2 2-2 3 2v-9c0-4.97-4.03-9-9-9zm-3.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" fill="currentColor"/></svg></span>Ghost<span class="modal-logo-dot">.</span>Busca</div>
-    <h2>Bem-vindo de volta</h2>
-    <p class="modal-sub">Entre com sua conta para continuar.</p>
-    <div class="modal-field"><label class="modal-label">E-mail ou nome de usuário</label><input class="modal-input" id="login-identifier" type="text" placeholder="seu@email.com ou nome" autocomplete="username"></div>
-    <div class="modal-field"><label class="modal-label">Senha</label>
-      <div class="modal-input-wrap">
-        <input class="modal-input" id="login-pw" type="password" placeholder="••••••••" autocomplete="current-password">
-        <button class="modal-eye" onclick="togglePw('login-pw','login-eye')" id="login-eye">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-      </div>
-    </div>
-    <div style="text-align:right;margin-top:-8px;margin-bottom:16px"><a style="font-size:.72rem;color:var(--muted);cursor:pointer" onmouseover="this.style.color='var(--p3)'" onmouseout="this.style.color='var(--muted)'">Esqueci minha senha</a></div>
-    <button class="modal-submit" onclick="submitLogin(this)">Entrar</button>
-    <div class="modal-footer">Não tem uma conta? <a onclick="switchModal('modal-login','modal-register')">Criar conta</a></div>
-  </div>
-</div>
+      <div class="rc-locked-grid">${fields}</div>
+    </div>`;
+}
 
-<!-- NAV -->
-<nav id="main-nav">
-  <div class="nav-inner">
-    <div class="nav-logo" onclick="goHome()">
-      <span class="nav-logo-ghost">👻</span>
-      <span>Ghost<span class="nav-logo-dot">.</span>Busca</span>
-    </div>
-    <div class="nav-r">
-      <span class="nav-pill">Beta</span>
-      <div id="nav-guest" style="display:flex;align-items:center;gap:8px">
-        <button class="btn-login" onclick="openModal('modal-login')">Login</button>
-        <button class="btn-register" onclick="openModal('modal-register')">Cadastro</button>
-      </div>
-      <div id="nav-user" style="display:none;align-items:center;gap:8px">
-        <div class="nav-avatar" onclick="goSettings()">
-          <div class="nav-av-circle" id="navAvCircle">R</div>
-          <span class="nav-av-name" id="navAvName">Usuário</span>
-        </div>
-      </div>
-      <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
-    </div>
-  </div>
-</nav>
+function upgradeBlock() {
+  const plan = currentUser?.plan || 'basico';
+  const planOrder = ['basico','starter','pro','premium'];
+  const planIdx = planOrder.indexOf(plan);
 
-<div class="store-hero-bar" id="store-hero">
-  <span style="font-size:1rem;font-weight:700">Ghost<span style="color:var(--p3)">.</span><span class="store-logo-store">Store</span></span>
-  <button class="nav-menu-btn" id="storeMenuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
-</div>
+  // Starter+ já tem foto — não mostra banner
+  if (planIdx >= 1) return '';
 
-<div id="menuBlurOverlay" class="menu-blur-overlay" onclick="closeMenu()"></div>
+  // adapta texto por módulo
+  let txt;
+  if (curMod === 'foto') {
+    txt = `Quer mais consultas de <strong>Foto Nacional?</strong> Faça upgrade para o <strong>Starter</strong>`;
+  } else {
+    txt = `Quer ver a <strong>foto real</strong> desta pessoa? Disponível no <strong>Starter</strong>`;
+  }
 
-<!-- DROPDOWN -->
-<div class="nav-dropdown" id="navDropdown">
-  <div class="nav-dropdown-inner">
-    <div class="nav-drop-items">
-      <div class="nav-drop-item" onclick="goStore();closeMenu()">
-        <div class="nav-drop-ico">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>
-        </div>
-        <div class="nav-drop-name">Produtos Ghost</div>
-      </div>
-      <div class="nav-drop-item" onclick="goModules();closeMenu()">
-        <div class="nav-drop-ico">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-        </div>
-        <div class="nav-drop-name">Consultas</div>
-      </div>
-      <div class="nav-drop-item" onclick="goHome();setTimeout(function(){var el=document.getElementById('plans');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},150);closeMenu()">
-        <div class="nav-drop-ico">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-        </div>
-        <div class="nav-drop-name">Ver planos</div>
-      </div>
-      <div class="nav-drop-item" id="menuCreditsItem" onclick="goWallet();closeMenu()">
-        <div class="nav-drop-ico">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <div class="nav-drop-name">Créditos</div>
-      </div>
-      <div class="nav-drop-item" id="menuSettingsItem" onclick="goSettings();closeMenu()" style="display:none">
-        <div class="nav-drop-ico">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </div>
-        <div style="flex:1">
-          <div class="nav-drop-name">Configurações</div>
-          <div id="menuPlanBadge" style="font-size:.62rem;color:var(--muted);margin-top:1px"></div>
-        </div>
-      </div>
-      <div class="nav-drop-item" id="menuHistoryItem" onclick="goHistory();closeMenu()" style="display:none">
-        <div class="nav-drop-ico">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <div class="nav-drop-name">Histórico</div>
-      </div>
-      <div class="nav-drop-item" onclick="goChat();closeMenu()">
-        <div class="nav-drop-ico" style="color:var(--p)">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        </div>
-        <div class="nav-drop-name">Atendimento</div>
-      </div>
-    </div>
-    <div class="nav-drop-divider"></div>
-    <div class="nav-drop-coupon">
-      <div class="nav-drop-coupon-title">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-        Resgatar cupom
-      </div>
-      <div class="coupon-input-wrap">
-        <input class="coupon-input" id="couponInput" type="text" placeholder="Digite seu cupom" maxlength="20" autocomplete="on">
-        <button class="coupon-btn" onclick="redeemCoupon()">Resgatar</button>
-      </div>
-      <div class="coupon-msg" id="couponMsg"></div>
-    </div>
-  </div>
-</div>
+  return `
+    <div class="res-upgrade" id="resUpgradeBanner">
+      <div class="res-upgrade-emoji"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--p3)"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+      <div class="res-upgrade-txt">${txt}</div>
+      <button class="res-upgrade-btn" onclick="goPlansFromResults()">Ver planos</button>
+      <button onclick="document.getElementById('resUpgradeBanner').remove()" style="flex-shrink:0;font-size:1rem;color:var(--muted);background:none;border:none;padding:0 4px;line-height:1;cursor:pointer" title="Fechar">✕</button>
+    </div>`;
+}
 
-<!-- LOADING -->
-<div class="ld" id="ld">
-  <div class="ld-ring"></div>
-  <div class="ld-steps">
-    <div class="ld-step" id="ls1"><span class="step-dot"></span><span id="ls1t">Iniciando...</span></div>
-    <div class="ld-step" id="ls2"><span class="step-dot"></span><span id="ls2t">Consultando...</span></div>
-    <div class="ld-step" id="ls3"><span class="step-dot"></span><span id="ls3t">Processando...</span></div>
-  </div>
-</div>
+// ── RENDER ──
+const FIELD_LABELS = {
+  cpf:'CPF', nome:'Nome', nascimento:'Nascimento', idade:'Idade', sexo:'Sexo',
+  estado_civil:'Estado Civil', nacionalidade:'Nacionalidade', naturalidade:'Naturalidade',
+  signo:'Signo', nome_mae:'Mãe', nome_pai:'Pai', irmaos:'Irmãos',
+  cnh:'CNH', titulo_eleitor:'Título de Eleitor',
+  logradouro:'Logradouro', numero:'Número', bairro:'Bairro', cidade:'Cidade',
+  uf:'UF', cep:'CEP', ibge:'IBGE', siafi:'SIAFI', gia:'GIA', ddd:'DDD',
+  situacao_cadastral:'Situação Cadastral', situacao_rf:'Situação RF',
+  empresario:'Empresário', cnpj:'CNPJ', servidor_publico:'Servidor Público',
+  cor_pele:'Cor da Pele', cor_olhos:'Cor dos Olhos', cor_cabelo:'Cor do Cabelo',
+  altura:'Altura', pis:'PIS', aposentado:'Aposentado', parto_gemelar:'Parto Gemelar',
+  escolaridade:'Escolaridade', cns_definitivo:'CNS Definitivo', cns_provisorio:'CNS Provisório',
+  nis_nit:'NIS/NIT', renda_atual:'Renda Atual', score_faixa:'Score Faixa', score_spc:'Score SPC',
+  vip_sus:'VIP SUS', vip_motivo:'Motivo VIP', nome_social:'Nome Social',
+  coordenada:'Coordenada', chassi:'Chassi', renavam:'RENAVAM',
+  placa_nacional:'Placa Nacional', placa_mercosul:'Placa Mercosul',
+  ano_fabricacao:'Ano de Fabricação', potencia:'Potência', peso_bruto:'Peso Bruto',
+  capacidade_passageiros:'Capacidade de Passageiros', telefone:'Telefone',
+  cnae_principal:'CNAE Principal', cnae_secundarios:'CNAEs Secundários',
+  socios:'Quadro Societário', telefones:'Telefones', emails:'E-mails',
+  nome_fantasia:'Nome Fantasia', razao_social:'Razão Social', data_abertura:'Data de Abertura',
+  natureza_juridica:'Natureza Jurídica', capital_social:'Capital Social', porte:'Porte',
+  codigo_situacao:'Código de Situação', data_situacao:'Data da Situação',
+  simples_nacional:'Simples Nacional', data_opcao_simples:'Data de Opção Simples', meio:'Meio',
+  complemento:'Complemento', regiao:'Região', latitude:'Latitude', longitude:'Longitude',
+  formato_internacional:'Formato Internacional', formato_nacional:'Formato Nacional',
+  formato_e164:'Formato E.164', numero_local:'Número Local', pais:'País',
+  codigo_iso:'Código ISO', fuso_horario:'Fuso Horário', operadora:'Operadora', status:'Status',
+  google_maps:'', ip:'IP', hostname:'Hostname', tipo:'Tipo', isp:'ISP', org:'Organização',
+  asn:'ASN', proxy:'Proxy', vpn:'VPN', tor:'Tor', hosting:'Hosting',
+  dominio:'Domínio', provedor:'Provedor', valido:'Válido', descartavel:'Descartável',
+  mx_valido:'MX Válido', breaches:'Vazamentos', fontes:'Fontes', ultima_vez:'Última Vez',
+};
 
-<!-- PAGE: HOME -->
-<div class="page" id="page-home">
-  <div class="hero">
-    <div class="hero-inner">
-      <div class="hero-badge" id="heroBadge"><span class="hero-badge-dot"></span>Sem cadastro obrigatório</div>
-      <h1 class="hero-title"><span class="gt">Consulte dados</span><br><span style="color:var(--fg)">de qualquer pessoa</span></h1>
-      <p class="hero-sub">Aqui tem consulta de CPF, CNPJ,<br>telefone e muito mais!</p>
-      <div class="hero-cta">
-        <button class="btn-cta scroll-fade" id="btnConsult" onclick="handleConsult(event)">
-          Consultar agora
-        </button>
-      </div>
-      <div class="hero-stats">
-        <div class="hero-stat"><span class="hero-stat-num" id="heroConsultas">+200k</span><span class="hero-stat-label">Consultas</span></div>
-        <div class="hero-stat"><span class="hero-stat-num">13+</span><span class="hero-stat-label">Módulos</span></div>
-        <div class="hero-stat"><span class="hero-stat-num" style="font-size:1.1rem">Gratuito</span><span class="hero-stat-label">Planos opcionais</span></div>
-      </div>
-    </div>
-  </div>
+const WIDE=new Set(['logradouro','email','status','nameservers','socios','google_maps','razao_social','nome_fantasia','natureza_juridica','telefone','atividade','cnae_principal','cnae_secundarios','irmaos','emails','telefones','coordenada','breaches','fontes']);
+const HTML_K=new Set(['google_maps','coordenada']);
 
-  <!-- PLANS -->
-  <div id="plans">
-    <p class="plans-label">Preços</p>
-    <h2 class="plans-title">Planos <span class="gt">baratinhos</span></h2>
-    <p class="plans-sub">o mais acessível do mercado</p>
-    <div class="plans-carousel-wrap"><div class="plans-grid-new" id="plansGrid">
-      <!-- Básico -->
-      <div class="pc scroll-fade" style="--fd:.0s">
-        <div class="pc-tag t-free">Gratuito</div>
-        <div class="pc-name" style="color:#4ade80">Básico</div>
-        <div class="pc-price-free">R$0</div>
-        <div class="pc-period">para sempre</div>
-        <div class="pc-div"></div>
-        <div class="pc-features">
-          <div class="pc-feature"><span class="pc-check">·</span><span>Até <strong>80 consultas</strong> por dia</span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>CNPJ / CEP / IP <strong>ilimitados</strong></span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>Gerar Pessoa <strong>ilimitado</strong></span></div>
-          <div class="pc-feature"><span class="pc-check" style="color:var(--p3)">·</span><span style="color:var(--muted)">CPF Pro e Foto Nacional <strong style="color:var(--muted2)">disponíveis avulsos</strong></span></div>
-        </div>
-        <div class="pc-acquired">✓ Adquirido</div>
-        <button class="pc-btn" style="margin-top:10px" ontouchstart="togglePlanDetail('detail-basico',this,event)" onclick="togglePlanDetail('detail-basico',this,event)">Ver módulos</button>
-        <div class="pc-detail" id="detail-basico">
-          <div class="pd-mod-grid">
-            <div class="pm-item"><span class="pm-name">CPF</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CPF Pro</span><span class="pm-val" style="color:var(--p3);font-size:.62rem">avulso</span></div>
-            <div class="pm-item"><span class="pm-name">Nome</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Família</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Telefone</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">E-mail</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Placa</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CNH</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CNPJ</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CEP</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">IP</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">WHOIS</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Foto Nacional</span><span class="pm-val" style="color:var(--p3);font-size:.62rem">avulso</span></div>
-            <div class="pm-item"><span class="pm-name">Exportar</span><span class="pm-val no">—</span></div>
-          </div>
-        </div>
-      </div>
-      <!-- Starter -->
-      <div class="pc scroll-fade" style="--fd:.1s">
-        <div class="pc-tag t-starter">Semanal</div>
-        <div class="pc-name">Starter</div>
-        <div class="pc-price-wrap">
-          <span class="pc-price-guest" id="starterPriceGuest">R$7,20</span>
-          <div class="pc-price" id="starterPriceMember">R$5,80</div>
-          <div class="pc-discount-tag" id="starterDiscTag">−19% cadastrando</div>
-        </div>
-        <div class="pc-period">por semana</div>
-        <div class="pc-div"></div>
-        <div class="pc-features">
-          <div class="pc-feature"><span class="pc-check">·</span><span>Até <strong>130 consultas</strong> por dia</span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>CPF Pro incluso</span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>Foto Nacional (<strong>3/dia</strong>)</span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>Histórico 7 dias</span></div>
-        </div>
-        <button class="pc-btn primary" onclick="buyPlan('starter',this)">Assinar</button>
-        <button class="pc-btn" style="margin-top:8px" ontouchstart="togglePlanDetail('detail-starter',this,event)" onclick="togglePlanDetail('detail-starter',this,event)">Ver módulos</button>
-        <div class="pc-detail" id="detail-starter">
-          <div class="pd-mod-grid">
-            <div class="pm-item"><span class="pm-name">CPF</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CPF Pro</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Nome</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Família</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Telefone</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">E-mail</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Placa</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CNH</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CNPJ</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CEP</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">IP</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">WHOIS</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Foto Nacional</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Exportar</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Histórico</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Lote</span><span class="pm-val no">—</span></div>
-          </div>
-        </div>
-      </div>
-      <!-- Pro -->
-      <div class="pc feat scroll-fade" style="--fd:.2s">
-        <div class="pc-tag t-pro">Quinzenal</div>
-        <div class="pc-name">Pro</div>
-        <div class="pc-price-wrap">
-          <span class="pc-price-guest" id="proPriceGuest">R$11,00</span>
-          <div class="pc-price" id="proPriceMember">R$8,90</div>
-          <div class="pc-discount-tag">−19% cadastrando</div>
-        </div>
-        <div class="pc-period">por quinzena</div>
-        <div class="pc-div"></div>
-        <div class="pc-features">
-          <div class="pc-feature"><span class="pc-check">·</span><span>Até <strong>200 consultas</strong> por dia</span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>Foto do rosto inclusa</span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>Histórico <strong>30 dias</strong></span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>Exportar resultados</span></div>
-        </div>
-        <button class="pc-btn primary" onclick="buyPlan('pro',this)">Assinar agora</button>
-        <button class="pc-btn" style="margin-top:8px" ontouchstart="togglePlanDetail('detail-pro',this,event)" onclick="togglePlanDetail('detail-pro',this,event)">Ver módulos</button>
-        <div class="pc-detail" id="detail-pro">
-          <div class="pd-mod-grid">
-            <div class="pm-item"><span class="pm-name">CPF</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CPF Pro</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Nome</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Família</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Telefone</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">E-mail</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Placa</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CNH</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CNPJ</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CEP</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">IP</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">WHOIS</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Foto Nacional</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Exportar</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Histórico</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Lote</span><span class="pm-val lim">✓</span></div>
-          </div>
-        </div>
-      </div>
-      <!-- Premium -->
-      <div class="pc feat2 scroll-fade" style="--fd:.3s">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div class="pc-tag t-premium" style="margin-bottom:0">Mensal</div><div class="pc-rec-badge-inline" style="background:linear-gradient(135deg,#c026d3,#f472b6)"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Recomendado</div></div>
-        <div class="pc-name">Premium</div>
-        <div class="pc-price-wrap">
-          <span class="pc-price-guest" id="premiumPriceGuest">R$17,50</span>
-          <div class="pc-price" id="premiumPriceMember">R$14,20</div>
-          <div class="pc-discount-tag">−19% cadastrando</div>
-        </div>
-        <div class="pc-period" style="color:rgba(148,163,184,.5)">por mês · cancele quando quiser</div>
-        <div class="pc-div"></div>
-        <div class="pc-features">
-          <div class="pc-feature"><span class="pc-check">·</span><span>Consultas <strong>ilimitadas</strong></span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span><strong>Todos</strong> os módulos</span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>Loja Ghost exclusiva</span></div>
-          <div class="pc-feature"><span class="pc-check">·</span><span>+5 dias <strong>bônus</strong></span></div>
-        </div>
-        <button class="pc-btn primary" onclick="buyPlan('premium',this)">Assinar agora</button>
-        <button class="pc-btn" style="margin-top:8px" ontouchstart="togglePlanDetail('detail-premium',this,event)" onclick="togglePlanDetail('detail-premium',this,event)">Ver módulos</button>
-        <div class="pc-detail" id="detail-premium">
-          <div class="pd-mod-grid">
-            <div class="pm-item"><span class="pm-name">CPF</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CPF Pro</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Nome</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Família</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Telefone</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">E-mail</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Placa</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CNH</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CNPJ</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">CEP</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">IP</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">WHOIS</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Foto Nacional</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Exportar</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Histórico</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Lote</span><span class="pm-val yes">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Sujar Nome</span><span class="pm-val lim">✓</span></div>
-            <div class="pm-item"><span class="pm-name">Loja Ghost</span><span class="pm-val lim">✓</span></div>
-          </div>
-        </div>
-      </div>
-    </div></div>
-    <div class="plans-dots" id="plansDots"></div>
-    <div class="plans-drag-hint">Arraste para ver mais</div>
-  </div>
+const MOD_RESULT_LABEL = {
+  familiares: (i, item) => {
+    const rel = item._relacao || '';
+    if (rel === 'filha') return `Filha ${i+1}`;
+    if (rel === 'filho') return `Filho ${i+1}`;
+    if (rel === 'irma') return `Irmã ${i+1}`;
+    if (rel === 'irmao') return `Irmão ${i+1}`;
+    if (rel === 'pai') return 'Pai';
+    if (rel === 'mae') return 'Mãe';
+    return `Familiar ${i+1}`;
+  },
+  cep: (i, item) => (item && item._type === 'cep_info') ? 'Informações do CEP' : `Residente ${(item && item._idx) || i}`,
+};
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  <!-- BANNER FLUTUANTE DESCONTO CADASTRO -->
-  <div class="discount-banner" id="discountBanner" onclick="openModal('modal-register')">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>
-    <span>Cadastre-se grátis e pague <strong>19% menos</strong> em todos os planos</span>
-    <span class="discount-banner-cta">Criar conta →</span>
-  </div>
+function renderResults(data){
+  const con = document.getElementById('resCon');
+  showPage('results');
+  const mod     = MODS[curMod];
+  const modIcon = mod ? '' : '';
+  const modName = mod?.name || curMod;
+  const count   = data?.length || 0;
+  const modSvg = MOD_SVGS[curMod] || modIcon;
+  const modIcoColor = curMod === 'foto' ? 'var(--p3)' : 'var(--p)';
+  const modHeader = `<div class="res-mod-header"><div class="res-mod-ico" style="color:${modIcoColor}">${modSvg}</div><div class="res-mod-name">${modName}</div></div>`;
+  if(!data || count === 0){
+    con.innerHTML = modHeader + `<div class="res-err"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted);margin:0 auto 8px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><h3>Nenhum resultado encontrado</h3><p>Verifique o dado informado e tente novamente.</p></div>`;
+    return;
+  }
 
-  <!-- FAQ -->
-  <div id="faq">
-    <div class="faq-bar" onclick="toggleFaqPanel()">
-      <div class="faq-bar-left">
-        <svg class="faq-bar-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span class="faq-bar-label">Perguntas frequentes</span>
-      </div>
-      <span class="faq-chevron">▼</span>
-    </div>
-    <div class="faq-panel">
-      <div class="faq-scroll">
-        <div class="faq-item" onclick="toggleFaq(this)">
-          <div class="faq-q">Preciso me cadastrar para usar?<span class="faq-icon">✕</span></div>
-          <div class="faq-a"><div class="faq-a-inner">Não. O plano Básico é totalmente gratuito e não exige nenhum cadastro. Basta acessar e consultar — até 80 consultas por dia.</div></div>
-        </div>
-        <div class="faq-item" onclick="toggleFaq(this)">
-          <div class="faq-q">Meus dados ficam salvos em algum lugar?<span class="faq-icon">✕</span></div>
-          <div class="faq-a"><div class="faq-a-inner">Por padrão, não armazenamos nenhuma consulta feita por você. Os resultados são exibidos em tempo real e descartados assim que você sai da página. Opcionalmente, você pode ativar o <strong>Histórico</strong> nas configurações — nesse caso, suas consultas e transações ficam salvas <strong>localmente no seu dispositivo</strong> e nunca são enviadas para nossos servidores. Você pode desativar ou apagar o histórico a qualquer momento.</div></div>
-        </div>
-        <div class="faq-item" onclick="toggleFaq(this)">
-          <div class="faq-q">Como funciona o pagamento dos planos?<span class="faq-icon">✕</span></div>
-          <div class="faq-a"><div class="faq-a-inner">Os pagamentos são processados de forma segura via Pix ou cartão. Você pode cancelar a qualquer momento, sem multa ou fidelidade.</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
+  // guarda dados pra download
+  window._lastResultData = { mod: curMod, modName, data };
+  let hasFoto = false;
 
-  <footer>
-    <div class="footer-inner">
-      <div class="footer-logo"><span>👻</span>Ghost<span style="color:var(--p3);letter-spacing:0">.</span>Busca</div>
-      <div class="footer-socials">
-        <a class="footer-icon" href="#" onclick="return false" title="Instagram">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".8" fill="currentColor" stroke="none"/></svg>
-        </a>
-        <a class="footer-icon" href="#" onclick="return false" title="Telegram">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-        </a>
-      </div>
-      <div class="footer-right">
-        <span class="footer-copy">© 2026 Ghost. Todos os direitos reservados.</span>
-        <div class="footer-links">
-          <span class="footer-link" onclick="alert('Termos em breve.')">Termos de Uso</span>
-          <span class="footer-sep">·</span>
-          <span class="footer-link" onclick="alert('Privacidade em breve.')">Privacidade</span>
-          <span class="footer-sep">·</span>
-          <span class="footer-link" onclick="alert('suporte@ghostbusca.com')">Contato</span>
-        </div>
-      </div>
-    </div>
-  </footer>
-</div>
+  let html = modHeader;
+  if(count > 1) html += `<div class="res-count">${count} RESULTADOS ENCONTRADOS</div>`;
+  data.forEach((item, i) => {
+    const labelFn = MOD_RESULT_LABEL[curMod];
+    const label = labelFn ? labelFn(i, item) : (count > 1 ? `Resultado ${i+1}` : 'Resultado');
+    if(item.__whois_raw){
+      html += `<div class="rc" style="animation-delay:${i*.07}s"><div class="rc-head"><div class="rc-card-label">${label}</div></div><div style="padding:16px 18px"><textarea class="whois-raw" readonly>${esc(item.__whois_raw)}</textarea></div></div>`;
+      return;
+    }
+    let fotoBlock = '';
+    if(item.__foto){
+      hasFoto = true;
+      delete item.__foto;
+      fotoBlock = `<div class="foto-placeholder-wrap"><div class="foto-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" style="opacity:.3;color:var(--muted)"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Foto indisponível</span></div><button class="foto-download-btn" disabled><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Baixar foto</button></div>`;
+    }
+    let bodyHtml = '';
+    const sectionKey = (item && item._type && MOD_SECTIONS[item._type]) ? item._type : curMod;
+    const sections = MOD_SECTIONS[sectionKey];
+    if(sections){ bodyHtml = renderWithSections(item, sections); }
+    else {
+      const fields = Object.entries(item).map(([k,v]) => {
+        if(!v || k.startsWith('_')) return '';
+        const lbl = k.replace(/_/g,' ').replace(/\b\w/g, ch => ch.toUpperCase());
+        const val = HTML_K.has(k) ? v : esc(v);
+        return `<div class="rf ${WIDE.has(k)?'wide':''}"><div class="rf-lbl">${lbl}</div><div class="rf-val">${val}</div></div>`;
+      }).join('');
+      bodyHtml = `<div class="rc-fields">${fotoBlock}${fields}</div>`;
+    }
+    html += `<div class="rc" style="animation-delay:${i*.07}s"><div class="rc-head"><div class="rc-card-label">${label}</div></div>${bodyHtml}</div>`;
+  });
+  html += upgradeBlock();
 
-<!-- PAGE: SETTINGS -->
-<div class="page" id="page-settings">
-  <div class="settings-wrap">
-    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-    <div class="settings-title">Minha Conta</div>
-    <div id="settingsContent"></div>
-  </div>
-</div>
-
-<!-- PAGE: HISTORY -->
-<div class="page" id="page-history">
-  <div class="settings-wrap">
-    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-    <div class="settings-title">Histórico</div>
-    <div id="historyContent"></div>
-  </div>
-</div>
-
-<!-- PAGE: STORE -->
-<div class="page" id="page-store">
-  <div class="store-subheader" style="padding-top:74px">
-    <button class="btn-back" onclick="goHome();closeMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-    <div class="store-count" id="storeCount">carregando...</div>
-  </div>
-  <div class="store-search-row">
-    <input class="store-search" type="text" placeholder="Buscar produtos..." oninput="filterProducts(this.value)" autocomplete="on">
-    <div style="position:relative">
-      <button class="store-filter-btn" id="storeFilterBtn" onclick="toggleStoreFilters()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>Filtros
-      </button>
-      <div id="storeFilterDropdown" style="display:none"></div>
-    </div>
-  </div>
-  <div class="store-grid" id="storeGrid"></div>
-</div>
-
-<!-- PAGE: PRODUCT -->
-<div class="page" id="page-product"><div id="productDetail"></div></div>
-
-<!-- PAGE: MODULES -->
-<div class="page" id="page-modules">
-  <div style="width:100%;max-width:700px;padding:8px 0 0">
-    <button class="btn-back" id="modsBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-  </div>
-  <div class="page-head"><h2>Escolha um <span class="gt">módulo</span></h2><p>Selecione o tipo de consulta</p></div>
-
-  <!-- BALÃO DE CRÉDITOS (acima das consultas) -->
-  <div id="creditsBalloonWrap" style="display:none;justify-content:flex-end;width:100%;max-width:700px;margin-bottom:6px">
-    <div class="credits-balloon" id="creditsBalloon" onclick="goWallet()">
-      <svg width="9" height="11" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:inline-block;vertical-align:middle;opacity:.8"><defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"><animate attributeName="stop-color" values="#a855f7;#c026d3;#f472b6;#c026d3;#a855f7" dur="3s" repeatCount="indefinite"/></stop><stop offset="100%" stop-color="#f472b6"><animate attributeName="stop-color" values="#f472b6;#a855f7;#c026d3;#a855f7;#f472b6" dur="3s" repeatCount="indefinite"/></stop></linearGradient></defs><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="url(#sg)" stroke-width="3" stroke-linecap="square" fill="none"/></svg>
-      <span id="creditsBalloonVal">Créditos</span>
-    </div>
-  </div>
-
-  <!-- BALÃO DE CONSULTAS -->
-  <div class="queries-balloon" id="queriesBalloon" style="position:relative">
-    <div class="qb-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
-    <div class="qb-info">
-      <div class="qb-label">Consultas hoje</div>
-      <div class="qb-bar-wrap"><div class="qb-bar" id="qbBar" style="width:0%"></div></div>
-      <div class="qb-nums"><span id="qbLeft">— restantes</span></div>
-    </div>
-    <button class="qb-info-btn" id="qbInfoBtn" onclick="toggleQbTooltip(event)">?</button>
-  </div>
-  <div class="qb-tooltip" id="qbTooltip"></div>
-
-  <div id="modulesCreditsBanner"></div>
-  <div class="mods-grid">
-    <div class="mc" onclick="goQuery('cpf')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 10h2M16 14h2M6 10h4M6 14h2"/></svg></div><div class="mc-name">CPF</div><div class="mc-link">Consultar</div></div>
-    <div class="mc locked" id="cpfproCard"><div class="mc-lock-badge">Starter+</div><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="mc-name">CPF Pro</div><div class="mc-desc" style="font-size:.68rem;color:var(--muted);line-height:1.4;margin-bottom:8px;flex:1;font-weight:300">Consulta de CPF avançada</div><div class="mc-link" style="color:var(--muted)">Ver opções</div></div>
-    <div class="mc" onclick="goQuery('pix')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 512 512" fill="currentColor"><path d="M242.4 292.5C247.8 287.1 257.1 287.1 262.5 292.5L339.5 369.5C353.7 383.7 372.6 391.5 392.6 391.5H407.7L310.6 488.6C280.3 518.1 231.1 518.1 200.8 488.6L103.3 391.2H112.6C132.6 391.2 151.5 383.4 165.7 369.2L242.4 292.5zM262.5 218.9C256.1 224.4 247.9 224.5 242.4 218.9L165.7 142.2C151.5 127.1 132.6 120.2 112.6 120.2H103.3L200.7 22.76C231.1-7.586 280.3-7.586 310.6 22.76L407.8 119.9H392.6C372.6 119.9 353.7 127.7 339.5 141.9L262.5 218.9zM112.6 142.7C126.4 142.7 139.1 148.3 149.7 158.1L226.4 234.8C233.6 241.1 243 245.6 252.5 245.6C261.9 245.6 271.3 241.1 278.5 234.8L355.5 157.8C365.3 148.1 378.8 142.5 392.6 142.5H430.3L488.6 200.8C518.9 231.1 518.9 280.3 488.6 310.6L430.3 368.9H392.6C378.8 368.9 365.3 363.3 355.5 353.6L278.5 276.6C264.6 262.7 240.3 262.7 226.4 276.6L149.7 353.2C139.1 363 126.4 368.6 112.6 368.6H80.78L22.41 310.2C-7.918 279.9-7.918 230.7 22.41 200.4L80.78 142H112.6z"/></svg></div><div class="mc-name">Pix</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('nome')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div><div class="mc-name">Nome</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('cnpj')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V7l8-4 8 4v14M9 21v-4h6v4M9 10h.01M15 10h.01M9 14h.01M15 14h.01"/></svg></div><div class="mc-name">CNPJ</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('cep')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div><div class="mc-name">CEP</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('familiares')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="18" cy="8" r="2.5"/><path d="M22 21v-1.5a3 3 0 0 0-2-2.83"/></svg></div><div class="mc-name">Família</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('telefone')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.8 19.8 0 0 1 1.08 3.4 2 2 0 0 1 3.05 1.22h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.1a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 21 16.92z"/></svg></div><div class="mc-name">Telefone</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('email')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg></div><div class="mc-name">E-mail</div><div class="mc-link">Consultar</div></div>
-    <div class="mc mc-foto" onclick="goQuery('foto')"><div class="mc-hot-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="url(#fg)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px;filter:drop-shadow(0 0 3px rgba(255,120,0,.7))"><defs><linearGradient id="fg" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#ff2200"><animate attributeName="stop-color" values="#ff2200;#ff6600;#ffcc00;#ff6600;#ff2200" dur="1.8s" repeatCount="indefinite"/></stop><stop offset="50%" stop-color="#ff6600"><animate attributeName="stop-color" values="#ff6600;#ffcc00;#ff2200;#ffcc00;#ff6600" dur="1.8s" repeatCount="indefinite"/></stop><stop offset="100%" stop-color="#ffcc00"><animate attributeName="stop-color" values="#ffcc00;#ff2200;#ff6600;#ff2200;#ffcc00" dur="1.8s" repeatCount="indefinite"/></stop></linearGradient></defs><path d="M12 2c-1.5 4-4 6-4 10a6 6 0 0 0 12 0c0-3-1.5-5-3-7-1 2-1.5 4-2 5-.5-2-.5-5-3-8z"/></svg>Mais pedido</div><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div><div class="mc-name">Foto Nacional</div><div class="mc-desc-foto">Foto do rosto pelo nome</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('placa')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5"/><circle cx="16" cy="17" r="2.5"/><circle cx="6.5" cy="17" r="2.5"/><path d="M3 12h9M7 5h4"/></svg></div><div class="mc-name">Placa</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('cnh')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2.5"/><path d="M13 10h4M13 14h2"/></svg></div><div class="mc-name">CNH</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('ip')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10A15.3 15.3 0 0 1 8 12a15.3 15.3 0 0 1 4-10z"/></svg></div><div class="mc-name">IP</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('whois')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div><div class="mc-name">WHOIS</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('cns')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="mc-name">CNS</div><div class="mc-link">Consultar</div></div>
-    <div class="mc" onclick="goQuery('renavam')"><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a1 1 0 0 1-1-1v-4l2-5h12l2 5v4a1 1 0 0 1-1 1h-2"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/><path d="M5 9h14"/></svg></div><div class="mc-name">RENAVAM</div><div class="mc-link">Consultar</div></div>
-    <div class="mc soon"><div class="mc-soon-badge">Em breve</div><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg></div><div class="mc-name">Radar</div><div class="mc-desc">Geolocalização em tempo real</div><div class="mc-link">Em breve</div></div>
-    <div class="mc soon"><div class="mc-soon-badge">Em breve</div><div class="mc-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M4 20c0-3.5 2.5-6 5-6"/><path d="M15.5 12l1.2 2.8 2.8 1.2-2.8 1.2-1.2 2.8-1.2-2.8-2.8-1.2 2.8-1.2z"/></svg></div><div class="mc-name">Gerar Pessoa</div><div class="mc-desc">Cria identidade fictícia completa</div><div class="mc-link">Em breve</div></div>
-  </div>
-</div>
-
-<!-- PAGE: QUERY -->
-<div class="page" id="page-query">
-  <div style="width:100%;max-width:440px;padding:8px 0 0">
-    <button class="btn-back" id="qBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-  </div>
-  <div class="q-wrap">
-    <div class="q-ico" id="qIco"></div>
-    <div class="q-title" id="qTit"></div>
-    <div class="q-sub" id="qSub"></div>
-    <div id="qMiniBalloon" class="q-mini-balloon" style="display:none">
-      <div class="qmb-dot"></div>
-      <span id="qMiniBalloonTxt"></span>
-    </div>
-    <div id="fam-selector">
-      <button class="fam-opt active" onclick="setFamType('mae',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/><path d="M9 11.5C9.5 14 10.5 15 12 15s2.5-1 3-3.5"/></svg> Mãe</button>
-      <button class="fam-opt" onclick="setFamType('pai',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/><line x1="12" y1="11" x2="12" y2="15"/><line x1="10" y1="13" x2="14" y2="13"/></svg> Pai</button>
-    </div>
-    <div class="q-box">
-      <div class="iw">
-        <input type="text" id="qInp" autocomplete="on" oninput="autoFmt(this)">
-        <span class="iw-ico" id="qIcoSm" style="display:flex;align-items:center"></span>
-      </div>
-      <button class="btn-search" onclick="doSearch()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        Consultar
-      </button>
-    </div>
-    <div id="qCreditsBanner" style="margin-top:12px"></div>
-  </div>
-</div>
-
-<!-- PAGE: UPGRADE -->
-<div class="page" id="page-upgrade">
-  <div style="width:100%;max-width:700px;padding:8px 0 0">
-    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar aos resultados</button>
-  </div>
-  <div class="upgrade-header">
-    <h2>Escolha um <span class="gt">plano</span></h2>
-    <p>Faça upgrade para desbloquear mais consultas</p>
-  </div>
-  <div class="plans-carousel-wrap" style="width:100%;max-width:700px">
-    <div class="plans-grid-new" id="plansGridUpgrade"></div>
-  </div>
-  <div class="plans-dots" id="plansDotsUpgrade" style="margin-top:12px"></div>
-  <div class="plans-drag-hint" style="margin-top:8px">Arraste para ver mais</div>
-</div>
-
-<!-- PAGE: WALLET -->
-<div class="page" id="page-wallet">
-  <div class="wallet-wrap">
-    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-    <div id="walletContent"></div>
-  </div>
-</div>
-
-<!-- PAGE: CREDITS INFO -->
-<div class="page" id="page-credits-info">
-  <div class="cinfo-wrap">
-    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-
-    <div class="cinfo-hero">
-      <div class="cinfo-s-wrap">
-        <div class="cinfo-s-ring">
-          <svg width="28" height="34" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sgHero" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"><animate attributeName="stop-color" values="#a855f7;#c026d3;#f472b6;#c026d3;#a855f7" dur="3s" repeatCount="indefinite"/></stop><stop offset="100%" stop-color="#f472b6"><animate attributeName="stop-color" values="#f472b6;#a855f7;#c026d3;#a855f7;#f472b6" dur="3s" repeatCount="indefinite"/></stop></linearGradient></defs><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="url(#sgHero)" stroke-width="2.5" stroke-linecap="square" fill="none"/></svg>
-        </div>
-      </div>
-      <div class="cinfo-hero-label">Créditos Ghost</div>
-      <h2>Consulte quando<br><span class="gt">quiser</span></h2>
-      <p>Sem assinatura, sem compromisso. Compre só o que precisar e use quando quiser.</p>
-    </div>
-
-    <div class="cinfo-cards">
-      <div class="cinfo-card" id="cinfo-c1">
-        <div class="cinfo-card-num">01</div>
-        <div class="cinfo-card-body">
-          <div class="cinfo-card-title">Nunca expiram</div>
-          <div class="cinfo-card-desc">Ficam na sua conta para sempre — sem prazo, sem pressão.</div>
-        </div>
-      </div>
-      <div class="cinfo-card" id="cinfo-c2">
-        <div class="cinfo-card-num">02</div>
-        <div class="cinfo-card-body">
-          <div class="cinfo-card-title">Sem plano obrigatório</div>
-          <div class="cinfo-card-desc">Pague só pelo que usar. Nada de mensalidade ou fidelidade.</div>
-        </div>
-      </div>
-      <div class="cinfo-card" id="cinfo-c3">
-        <div class="cinfo-card-num">03</div>
-        <div class="cinfo-card-body">
-          <div class="cinfo-card-title">Todos os módulos</div>
-          <div class="cinfo-card-desc">CPF, Foto, Placa, CNH, Família e mais — tudo disponível.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="cinfo-price-row">
-      <span class="cinfo-price-from">A partir de</span>
-      <span class="cinfo-price-val">R$0,19 por consulta</span>
-    </div>
-
-    <button class="cinfo-buy-btn" id="cinfoBtn" onclick="goCredits(_creditsInfoMod)">
-      <svg width="10" height="12" viewBox="0 0 20 24" fill="none"><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="#fff" stroke-width="3" stroke-linecap="square"/></svg>
-      Comprar créditos
+  // botão de download dos resultados (sem foto)
+  html += `<div style="margin-top:8px">
+    <button onclick="downloadResults()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.78rem;font-weight:500;color:var(--muted2);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:.6rem;padding:11px;transition:all .15s" onmouseover="this.style.borderColor='rgba(255,255,255,.14)';this.style.color='var(--fg)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)';this.style.color='var(--muted2)'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Baixar resultados (.txt)
     </button>
-  </div>
-</div>
+  </div>`;
 
-<!-- PAGE: CREDITS -->
-<div class="page" id="page-credits">
-  <div class="credits-wrap">
-    <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
+  con.innerHTML = html;
 
-    <div style="text-align:center;margin-bottom:20px">
-      <div class="credits-mod-tag" id="creditsModTag" style="display:inline-flex;margin:0 auto 12px">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        <span id="creditsModName">Créditos avulsos</span>
-      </div>
-      <div class="credits-title">Comprar créditos</div>
-      <p class="credits-sub" style="margin-bottom:0"><span id="creditsCostHint"></span></p>
-    </div>
+  // confirmação ao sair se tem foto e não baixou
+  window._hasFotoNotDownloaded = hasFoto;
+}
 
-    <div class="credits-qty-wrap">
-      <div class="credits-qty-label">Quantas consultas você quer?</div>
-      <div class="credits-qty-row">
-        <button class="credits-qty-btn" onclick="changeCreditsQty(-1)">−</button>
-        <input type="number" class="credits-qty-num" id="creditsQtyNum" value="1" min="1" max="100" oninput="onCreditsQtyInput(this)" style="-webkit-user-select:text;user-select:text">
-        <button class="credits-qty-btn" onclick="changeCreditsQty(1)">+</button>
-      </div>
-      <div class="credits-presets" id="creditsPresets"></div>
-    </div>
+function renderErr(t, m){
+  showPage('results');
+  document.getElementById('resCon').innerHTML=`<div class="res-err">
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted);margin:0 auto 10px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <h3>${t}</h3><p>${m}</p>
+  </div>`;
+}
 
-    <div class="credits-summary" id="creditsSummary"></div>
+// ── SEÇÕES POR MÓDULO ──
+const MOD_SECTIONS = {
+  cpf: {
+    'Identificação':['cpf','nome','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
+    'Filiação':['nome_mae','nome_pai'],
+    'Documentos':['cnh','titulo_eleitor'],
+    'Endereço':['logradouro','numero','bairro','cidade','uf','cep','ibge'],
+    'Situação':['situacao_cadastral'],
+  },
+  pix: {
+    'Identificação':['cpf','nome','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
+    'Filiação':['nome_mae','nome_pai'],
+    'Documentos':['cnh','titulo_eleitor'],
+    'Endereço':['logradouro','numero','bairro','cidade','uf','cep','ibge'],
+    'Situação':['situacao_cadastral'],
+  },
+  nome: {
+    'Identificação':['cpf','nome','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
+    'Filiação':['nome_mae','nome_pai'],
+    'Documentos':['cnh','titulo_eleitor'],
+    'Endereço':['logradouro','numero','bairro','cidade','uf','cep','ibge'],
+    'Situação':['situacao_cadastral'],
+  },
+  cpfpro: {
+    'Identificação':['cpf','nome','nascimento','idade','sexo','signo','estado_civil','empresario','cnpj','servidor_publico'],
+    'Biometria':['cor_pele','cor_olhos','cor_cabelo','altura','pis'],
+    'Pessoal':['nacionalidade','naturalidade','aposentado','parto_gemelar','escolaridade'],
+    'Filiação':['nome_mae','nome_pai','irmaos'],
+    'Documentos':['cns_definitivo','cns_provisorio','nis_nit','titulo_eleitor'],
+    'Situação':['situacao_rf','situacao_cadastral'],
+    'Financeiro':['renda_atual','score_faixa','score_spc'],
+    'VIP SUS':['vip_sus','vip_motivo'],
+    'Endereço':['logradouro','numero','bairro','cidade','uf','cep','ibge','siafi','gia','ddd','coordenada'],
+    'Automóvel':['chassi','cnh','renavam','placa_nacional','placa_mercosul','ano_fabricacao','potencia','peso_bruto','capacidade_passageiros'],
+    'Contato':['telefone'],
+  },
+  cep: {
+    'Endereço':['cep','logradouro','tipo','complemento','bairro','cidade','estado','uf'],
+    'Região':['regiao','ddd','ibge','gia','siafi'],
+    'Localização':['latitude','longitude','google_maps'],
+  },
+  cep_morador: {
+    'Residente':['nome','cpf','nascimento','sexo','numero','bairro'],
+  },
+  cnpj: {
+    'Identificação':['cnpj','nome','nome_fantasia','razao_social','data_abertura','natureza_juridica'],
+    'Porte':['porte','capital_social','codigo_situacao','data_situacao'],
+    'Atividade':['cnae_principal','cnae_secundarios'],
+    'Quadro Societário':['socios'],
+    'Contato':['telefones','emails'],
+    'Endereço':['logradouro','numero','bairro','cidade','uf','cep'],
+    'Fiscal':['simples_nacional','data_opcao_simples','meio'],
+  },
+  placa: {
+    'Veículo':['placa_nacional','placa_mercosul','chassi','renavam','ano_fabricacao','potencia','peso_bruto','capacidade_passageiros'],
+    'Proprietário':['nome','cpf','nascimento','sexo'],
+    'Endereço':['logradouro','numero','bairro','cidade','uf','cep'],
+  },
+  telefone: {
+    'Dados Estáticos':['formato_internacional','formato_nacional','formato_e164','numero_local','pais','codigo_iso','fuso_horario','operadora','status'],
+    'Identificação':['nome','cpf','nascimento','sexo','estado_civil'],
+    'Endereço':['logradouro','numero','bairro','cidade','uf','cep'],
+    'Geolocalização':['regiao','latitude','longitude','google_maps'],
+  },
+  cns: {
+    'Identificação':['cns_definitivo','cns_provisorio','nome','cpf','nascimento','sexo'],
+    'Filiação':['nome_mae','nome_pai'],
+  },
+  renavam: {
+    'Veículo':['renavam','placa_nacional','placa_mercosul','chassi','ano_fabricacao','potencia','peso_bruto','capacidade_passageiros'],
+    'Proprietário':['nome','cpf','nascimento','sexo'],
+    'Endereço':['logradouro','numero','bairro','cidade','uf','cep'],
+  },
+  ip: {
+    'Identificação':['ip','hostname','tipo','isp','org','asn'],
+    'Localização':['pais','codigo_pais','regiao','cidade','cep','latitude','longitude','fuso_horario'],
+    'Rede':['proxy','vpn','tor','hosting'],
+  },
+  email: {
+    'Identificação':['email','nome','cpf','nascimento','sexo'],
+    'Domínio':['dominio','provedor','valido','descartavel','mx_valido'],
+    'Vazamentos':['breaches','fontes','ultima_vez'],
+    'Endereço':['logradouro','cidade','uf'],
+  },
+  whois: {},
+  familiares: {},
+  foto: {},
+  cnh: {},
+};
 
-    <button class="credits-buy-btn" id="creditsBuyBtn" onclick="buyCreditsNow()">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-      <span id="creditsBuyLabel">Comprar agora</span>
-    </button>
+function renderWithSections(item, sections){
+  let html = '';
+  const rendered = new Set();
+  for(const [title, keys] of Object.entries(sections)){
+    const rows = keys.map(k => {
+      const v = item[k];
+      rendered.add(k);
+      const lbl = FIELD_LABELS[k] || k.replace(/_/g,' ').replace(/\b\w/g, ch => ch.toUpperCase());
+      if(lbl === '') return ''; // campos ocultos como google_maps inline
+      const val = v ? (HTML_K.has(k) ? v : esc(v)) : '<span style="color:rgba(148,163,184,.45);font-style:italic;font-size:.75rem">Indisponível</span>';
+      return `<div class="rf ${WIDE.has(k)?'wide':''}"><div class="rf-lbl">${lbl}</div><div class="rf-val">${val}</div></div>`;
+    }).join('');
+    if(rows.trim()) html += `<div class="rc-section-label">${title}</div><div class="rc-fields">${rows}</div>`;
+  }
+  const rest = Object.entries(item).filter(([k])=>!rendered.has(k) && !k.startsWith('_')).map(([k,v])=>{
+    const lbl = FIELD_LABELS[k] || k.replace(/_/g,' ').replace(/\b\w/g, ch => ch.toUpperCase());
+    const val = v ? esc(v) : '<span style="color:rgba(148,163,184,.45);font-style:italic;font-size:.75rem">Indisponível</span>';
+    return `<div class="rf ${WIDE.has(k)?'wide':''}"><div class="rf-lbl">${lbl}</div><div class="rf-val">${val}</div></div>`;
+  }).join('');
+  if(rest.trim()) html += `<div class="rc-fields" style="padding-top:8px">${rest}</div>`;
+  return html;
+}
 
-    <div style="margin-top:14px;text-align:center">
-      <div id="creditsBalanceInfo" style="font-size:.78rem;color:var(--muted)"></div>
-    </div>
-  </div>
-</div>
+  // EXPOR GLOBALS (funções usadas pelo HTML e outros módulos)
+  window.doSearch      = doSearch;
+  window.autoFmt       = autoFmt;
+  window.renderErr     = renderErr;
+  window._runSearch    = _runSearch;
+  window.renderResults = renderResults;
 
-<!-- CONFIRM USAR CRÉDITOS -->
-<div class="confirm-overlay" id="confirmUseCredits">
-  <div class="confirm-box" style="max-width:300px">
-    <h3 id="creditsConfirmTitle">Usar créditos?</h3>
-    <p id="creditsConfirmMsg">Esta consulta vai gastar créditos da sua carteira.</p>
-    <div class="confirm-btns">
-      <button class="confirm-cancel" onclick="document.getElementById('confirmUseCredits').classList.remove('open')">Cancelar</button>
-      <button class="confirm-logout" style="background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.3);color:var(--p3)" onclick="document.getElementById('confirmUseCredits').classList.remove('open');_doSearchCreditsConfirmed()">Consultar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL UPGRADE/UNLOCK -->
-<div class="confirm-overlay" id="modalUnlock">
-  <div class="confirm-box" style="max-width:340px" id="modalUnlockBox">
-    <div id="modalUnlockContent"></div>
-  </div>
-</div>
-
-<!-- CSB CONFIRM FECHAR -->
-<div class="csb-confirm-overlay" id="csbConfirm">
-  <div class="csb-confirm-box">
-    <p>Deseja fechar este aviso?<br>Você ainda pode acessar créditos pelo menu ou pelo botão no topo.</p>
-    <div style="display:flex;gap:10px">
-      <button class="confirm-cancel" style="flex:1;padding:9px;border-radius:var(--r);font-size:.8rem;font-weight:600;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted2)" onclick="document.getElementById('csbConfirm').classList.remove('open')">Cancelar</button>
-      <button class="confirm-logout" style="flex:1;padding:9px;border-radius:var(--r);font-size:.8rem;font-weight:600;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);color:var(--p3)" onclick="dismissCreditsBanner()">Fechar</button>
-    </div>
-    <small>O aviso vai aparecer novamente em breve.</small>
-  </div>
-</div>
-
-
-<!-- CONFIRM APAGAR HISTÓRICO -->
-<div class="confirm-overlay" id="confirmClearHistory">
-  <div class="confirm-box">
-    <h3>Apagar histórico?</h3>
-    <p>Esta ação não pode ser desfeita.</p>
-    <div class="confirm-btns">
-      <button class="confirm-cancel" onclick="document.getElementById('confirmClearHistory').classList.remove('open')">Cancelar</button>
-      <button class="confirm-logout" onclick="document.getElementById('confirmClearHistory').classList.remove('open');histClear();renderHistory()">Apagar</button>
-    </div>
-  </div>
-</div>
-
-<!-- CONFIRM LOGOUT -->
-<div class="confirm-overlay" id="confirmLogout">
-  <div class="confirm-box">
-    <h3>Sair da conta?</h3>
-    <p>Você precisará fazer login novamente para acessar seu plano e histórico.</p>
-    <div class="confirm-btns">
-      <button class="confirm-cancel" onclick="document.getElementById('confirmLogout').classList.remove('open')">Cancelar</button>
-      <button class="confirm-logout" onclick="document.getElementById('confirmLogout').classList.remove('open');_doLogout()">Sair</button>
-    </div>
-  </div>
-</div>
-
-<div class="confirm-overlay" id="confirmPwChange">
-  <div class="confirm-box">
-    <h3>Alterar senha?</h3>
-    <p>Tem certeza que deseja redefinir sua senha de acesso?</p>
-    <div class="confirm-btns">
-      <button class="confirm-cancel" onclick="document.getElementById('confirmPwChange').classList.remove('open')">Cancelar</button>
-      <button class="confirm-logout" onclick="document.getElementById('confirmPwChange').classList.remove('open');_doSaveProfile()">Confirmar</button>
-    </div>
-  </div>
-</div>
-
-<!-- PAGE: RESULTS -->
-<div class="page" id="page-results">
-  <div class="res-wrap">
-    <button class="btn-back res-back-btn" id="btnBk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-    <div id="resCon"></div>
-    <div id="resCreditsBanner" style="margin-top:8px"></div>
-  </div>
-</div>
-
-<!-- PAGE: CHAT DE SUPORTE -->
-<div class="page" id="page-chat">
-  <div class="chat-wrap">
-    <div class="chat-header">
-      <button class="btn-back" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar</button>
-      <div class="chat-header-info">
-        <div class="chat-header-title">Atendimento Ghost</div>
-        <div class="chat-header-status" id="chatStatus"><span class="chat-status-dot" id="chatStatusDot"></span><span id="chatStatusTxt">Online</span></div>
-      </div>
-
-    </div>
-    <div class="chat-messages" id="chatMessages">
-      <div class="chat-system-msg">
-        <div class="chat-system-ico">👻</div>
-        <div class="chat-system-text">
-          <strong>Ghost. Suporte</strong>
-          <p id="chatWelcomeMsg">Olá! Seja bem-vindo ao suporte Ghost. Envie sua mensagem e responderemos assim que pudermos.</p>
-          <span class="chat-system-time" id="chatWelcomeTime"></span>
-        </div>
-      </div>
-    </div>
-    <!-- Popover de perfil -->
-    <div class="chat-profile-popover" id="chatProfilePopover">
-      <div class="cpp-avatar" id="cppAvatar"></div>
-      <div class="cpp-name" id="cppName">Usuário</div>
-      <div class="cpp-plan" id="cppPlan"></div>
-      <div class="cpp-close" onclick="closeChatProfile()">✕</div>
-    </div>
-    <div class="chat-input-area">
-      <div class="chat-user-avatar" id="chatUserAvatar" onclick="openChatProfile()"></div>
-      <div class="chat-input-wrap">
-        <textarea class="chat-input" id="chatInput" placeholder="Digite sua mensagem..." rows="1" maxlength="500" oninput="autoResizeChatInput(this)" onkeydown="chatInputKeydown(event)"></textarea>
-        <div class="chat-input-counter" id="chatInputCounter">500</div>
-      </div>
-      <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      </button>
-    </div>
-    <div class="chat-rate-warn" id="chatRateWarn"></div>
-  </div>
-</div>
-
-<!-- PAGE: PÓS-COMPRA (Thank You) -->
-<div class="page" id="page-thankyou">
-  <div class="ty-wrap">
-    <canvas id="ty-canvas" class="ty-canvas"></canvas>
-    <div class="ty-content" id="tyContent">
-      <div class="ty-icon" id="tyIcon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <h2 class="ty-title" id="tyTitle">Compra realizada!</h2>
-      <p class="ty-sub" id="tySub">Seu acesso foi liberado com sucesso.</p>
-      <div class="ty-question" id="tyQuestion">
-        <p class="ty-q-text">Teve algum problema durante a compra?</p>
-        <div class="ty-btns">
-          <button class="ty-btn ty-btn-no" onclick="tyAnswerNo()">Não, tudo certo!</button>
-          <button class="ty-btn ty-btn-yes" onclick="tyAnswerYes()">Sim, preciso de ajuda</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- UPGRADE OVERLAY -->
-<div id="upgrade-overlay">
-  <canvas id="upg-canvas"></canvas>
-  <div class="upg-stage" id="upgStage">
-    <div class="upg-card" id="upgCardOld"></div>
-    <div class="upg-card" id="upgCardNew" style="opacity:0"></div>
-    <div class="upg-particles" id="upgParticles"></div>
-  </div>
-  <div class="upg-label" id="upgLabel"></div>
-</div>
-<!-- FILTER POPUP OVERLAY -->
-<div class="filter-overlay" id="filterOverlay" onclick="toggleStoreFilters()"></div>
-<div class="filter-popup" id="filterPopup">
-  <div class="filter-popup-header">
-    <span class="filter-popup-title">Filtrar produtos</span>
-    <button class="filter-popup-clearbtn" onclick="clearPriceFilter()">Limpar filtros</button>
-  </div>
-
-  <div class="filter-popup-body">
-    <div class="filter-section-label">PREÇO MÍNIMO</div>
-    <input class="filter-price-input" id="filterPriceMin" type="number" placeholder="R$ 0,00" min="0" step="0.01">
-
-    <div class="filter-section-label" style="margin-top:18px">PREÇO MÁXIMO</div>
-    <input class="filter-price-input" id="filterPriceMax" type="number" placeholder="Sem limite" min="0" step="0.01">
-
-    <div class="filter-section-label" style="margin-top:22px">ORDENAR POR</div>
-    <div class="filter-sort-row">
-      <button id="sort-newest"     class="filter-sort-chip active"   onclick="window._storeSort='newest';updateSortChips()">Recentes</button>
-      <button id="sort-price_asc"  class="filter-sort-chip"          onclick="window._storeSort='price_asc';updateSortChips()">Menor preço</button>
-      <button id="sort-price_desc" class="filter-sort-chip"          onclick="window._storeSort='price_desc';updateSortChips()">Maior preço</button>
-      <button id="sort-az"         class="filter-sort-chip"          onclick="window._storeSort='az';updateSortChips()">A→Z</button>
-      <button id="sort-za"         class="filter-sort-chip"          onclick="window._storeSort='za';updateSortChips()">Z→A</button>
-    </div>
-  </div>
-
-  <div class="filter-popup-footer">
-    <button class="filter-apply-btn" onclick="applyPriceFilter()">Aplicar filtros</button>
-    <button class="filter-cancel-btn" onclick="toggleStoreFilters()">Cancelar</button>
-  </div>
-</div>
-
-<!-- MODAL CUPOM DE BOAS-VINDAS -->
-<div class="confirm-overlay" id="welcomeCouponModal">
-  <div class="confirm-box welcome-coupon-box">
-    <div class="wc-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><line x1="9" y1="9" x2="9" y2="9.01"/><line x1="9" y1="15" x2="9" y2="15.01"/><line x1="9" y1="12" x2="15" y2="12"/></svg></div>
-    <h3 class="wc-title">Cupom ativado!</h3>
-    <p class="wc-sub">Você ganhou desconto exclusivo de boas-vindas. Os preços já estão com o desconto aplicado para você.</p>
-    <div class="wc-discounts">
-      <div class="wc-row"><span class="wc-plan">Starter</span><span class="wc-disc">−27%</span><span class="wc-price">R$5,80<span class="wc-orig">/semana</span></span></div>
-      <div class="wc-row"><span class="wc-plan">Pro</span><span class="wc-disc">−25%</span><span class="wc-price">R$8,90<span class="wc-orig">/quinzena</span></span></div>
-      <div class="wc-row"><span class="wc-plan">Premium</span><span class="wc-disc">−25%</span><span class="wc-price">R$14,20<span class="wc-orig">/mês</span></span></div>
-    </div>
-    <button class="confirm-logout wc-btn" onclick="closeWelcomeCouponModal()">Aproveitar agora</button>
-  </div>
-</div>
-
-<!-- ── GHOST BUSCA — Módulos JS (cada um isolado com try/catch) ── -->
-<script src="js/config.js"></script>
-<script src="js/supabase.js"></script>
-<script src="js/core.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/features.js"></script>
-<script src="js/search.js"></script>
-
-<!-- ── AVATAR CROPPER ── -->
-<div class="ghost-crop-ov" id="ghost-cropOv">
-  <div class="ghost-crop-title">Ajustar foto</div>
-  <div class="ghost-crop-stage" id="ghost-cropStage">
-    <img class="ghost-crop-img" id="ghost-cropImg" draggable="false">
-    <div class="ghost-crop-circle"></div>
-  </div>
-  <div class="ghost-crop-btns">
-    <button class="ghost-crop-cancel" onclick="closeCropper()">Cancelar</button>
-    <button class="ghost-crop-confirm" onclick="confirmCrop()">Confirmar</button>
-  </div>
-</div>
-</body>
-</html>
+  console.log("[ghost:search] módulo carregado ✓");
+} catch(e) {
+  console.error("[ghost:search] ERRO AO CARREGAR:", e);
+  // Fallback: mostra erro amigável ao tentar buscar
+  window.doSearch = function() {
+    if (typeof renderErr === "function") {
+      renderErr("Módulo de busca indisponível", "Erro interno. Tente recarregar a página.");
+      if (typeof showPage === "function") showPage("results");
+    } else { alert("Erro: módulo de busca indisponível. Recarregue a página."); }
+  };
+  window.autoFmt = function() {};
+}
