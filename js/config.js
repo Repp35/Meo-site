@@ -68,15 +68,39 @@ const CHAT_MAX_PER_MIN   = 10;
 (function(){
   function _anyOverlayOpen() {
     return !!(
+      window._overlayOpen ||
       document.querySelector('.modal-overlay.open') ||
       document.querySelector('.confirm-overlay.open') ||
       document.querySelector('.csb-confirm-overlay.open') ||
       document.getElementById('navDropdown')?.classList.contains('open')
     );
   }
+
+  // MutationObserver — seta flag imediatamente quando qualquer overlay abre
+  const _mo = new MutationObserver(() => {
+    window._overlayOpen = !!(
+      document.querySelector('.modal-overlay.open') ||
+      document.querySelector('.confirm-overlay.open') ||
+      document.querySelector('.csb-confirm-overlay.open')
+    );
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.modal-overlay,.confirm-overlay,.csb-confirm-overlay').forEach(el => {
+      _mo.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+  });
+
+  // trava no touchstart já — sem delay de animação
+  document.addEventListener('touchstart', function(e) {
+    if (!_anyOverlayOpen()) return;
+    const modal = document.querySelector('.modal-overlay.open .modal') ||
+                  document.querySelector('.confirm-overlay.open .confirm-box') ||
+                  document.querySelector('.csb-confirm-overlay.open .csb-confirm-box');
+    if (modal && modal.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
   document.addEventListener('touchmove', function(e) {
     if (!_anyOverlayOpen()) return;
-    // permite scroll dentro do próprio modal/confirm (ex: modal de cadastro longo)
     const modal = document.querySelector('.modal-overlay.open .modal') ||
                   document.querySelector('.confirm-overlay.open .confirm-box') ||
                   document.querySelector('.csb-confirm-overlay.open .csb-confirm-box');
