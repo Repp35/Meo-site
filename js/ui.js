@@ -1,5 +1,37 @@
 // Contém: animações 3D, wallet, histórico, settings, chat
 
+// ── MENU ──
+function toggleMenu() {
+  const btn      = document.getElementById('menuBtn');
+  const storeBtn = document.getElementById('storeMenuBtn');
+  const dd       = document.getElementById('navDropdown');
+  const isOpen   = dd.classList.contains('open');
+  if (isOpen) closeMenu();
+  else {
+    btn?.classList.add('open'); storeBtn?.classList.add('open');
+    dd.classList.add('open');
+    document.getElementById('menuBlurOverlay').classList.add('on');
+    document.body.style.overflow = 'hidden';
+    closeAllPlanDetails();
+  }
+}
+function closeMenu() {
+  document.getElementById('menuBtn')?.classList.remove('open');
+  document.getElementById('storeMenuBtn')?.classList.remove('open');
+  document.getElementById('navDropdown')?.classList.remove('open');
+  document.getElementById('menuBlurOverlay')?.classList.remove('on');
+  if (!document.querySelector('.modal-overlay.open')) {
+    document.body.style.overflow = '';
+  }
+}
+document.addEventListener('click', e => {
+  const btn      = document.getElementById('menuBtn');
+  const storeBtn = document.getElementById('storeMenuBtn');
+  const dd       = document.getElementById('navDropdown');
+  if (dd?.classList.contains('open') && !dd.contains(e.target) && !btn?.contains(e.target) && !storeBtn?.contains(e.target)) closeMenu();
+});
+
+
 // ── ANIMAÇÃO DE UPGRADE ──
 function playUpgradeAnimation(oldPlan, newPlan, onDone) {
   const overlay  = document.getElementById('upgrade-overlay');
@@ -403,7 +435,7 @@ function showToast(msg, type='success') {
 
 function goHistory() { pushNav('history'); renderHistory(); showPage('history'); }
 function goSettings() { pushNav('settings'); renderSettings(); showPage('settings'); }
-function goUpgradePage() { goPlansFromResults(); }
+function goUpgradePage() { goPlansFromResults(); closeMenu(); }
 
 function updateMiniBalloon(mod) {
   const el=document.getElementById('qMiniBalloon'), txt=document.getElementById('qMiniBalloonTxt');
@@ -721,7 +753,7 @@ detectDevice();window.addEventListener('resize',detectDevice);
 })();
 
 // ── FIX OVERFLOW SCROLL ──
-document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend',()=>{if(!document.querySelector('.modal-overlay.open'))document.body.style.overflow='';});});
+document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend',()=>{if(!document.querySelector('.modal-overlay.open')&&!document.getElementById('navDropdown')?.classList.contains('open'))document.body.style.overflow='';});});
 
 // TILT 3D — CARDS DE CRÉDITO
 (function(){
