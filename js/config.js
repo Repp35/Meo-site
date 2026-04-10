@@ -48,6 +48,22 @@ const CHAT_BLOCKED_WORDS = ['xingamento','palavrão','lixo','idiota','otário','
 const CHAT_COOLDOWN_MS   = 5000;
 const CHAT_MAX_PER_MIN   = 10;
 
+// ── BLOQUEAR ZOOM ──
+(function(){
+  // bloqueia pinça (touchstart com 2+ dedos)
+  document.addEventListener('touchstart', function(e){
+    if(e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+  // bloqueia gesture events (Safari iOS)
+  document.addEventListener('gesturestart',  function(e){ e.preventDefault(); }, { passive: false });
+  document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, { passive: false });
+  document.addEventListener('gestureend',    function(e){ e.preventDefault(); }, { passive: false });
+  // bloqueia ctrl+scroll (desktop)
+  document.addEventListener('wheel', function(e){
+    if(e.ctrlKey) e.preventDefault();
+  }, { passive: false });
+})();
+
 // ── SUPABASE ──
 const SUPABASE_URL  = 'https://wpdjetsomlvmlnkpkwja.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZGpldHNvbWx2bWxua3Brd2phIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTc3MTIsImV4cCI6MjA5MDMzMzcxMn0.Ggboop89c8yb8pSjIqBtFnUgjpf6jPT988qcAE8bBVA';
