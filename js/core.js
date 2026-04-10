@@ -1,18 +1,11 @@
 // GHOST BUSCA — Core (Auth, UI, Store, Wallet, Settings, History, Chat)
 
-// ── ESTADO DO USUÁRIO ──
-let currentUser = null; // { name, email, plan }
-let queryCounters = {}; // { cpf: 3, nome: 1, ... }
-let activeCoupon = null;
-
-// ── AUTH & CONTA — Supabase ──
-
-// ── helpers de scroll lock (trava scroll sem bloquear cliques) ──
+// ── SCROLL LOCK (trava scroll sem bloquear cliques/toques) ──
 let _scrollLockCount = 0;
 function lockScroll() {
   _scrollLockCount++;
   if (_scrollLockCount > 1) return;
-  const sy = window.scrollY;
+  const sy = window.scrollY || window.pageYOffset;
   document.body.style.position = 'fixed';
   document.body.style.top = `-${sy}px`;
   document.body.style.left = '0';
@@ -29,6 +22,13 @@ function unlockScroll() {
   document.body.style.right = '';
   window.scrollTo(0, sy);
 }
+
+// ── ESTADO DO USUÁRIO ──
+let currentUser = null; // { name, email, plan }
+let queryCounters = {}; // { cpf: 3, nome: 1, ... }
+let activeCoupon = null;
+
+// ── AUTH & CONTA — Supabase ──
 
 // ── helpers de storage local (apenas para preferências leves) ──
 const LS = {
@@ -1071,7 +1071,6 @@ function closeAllModals(){
     setTimeout(() => { m.classList.remove('open','closing'); if (modal) modal.classList.remove('closing'); }, 200);
   });
   setTimeout(() => {
-    // só libera scroll se menu também estiver fechado
     if (!document.getElementById('navDropdown')?.classList.contains('open')) {
       unlockScroll();
     }
@@ -1264,7 +1263,7 @@ function closeMenu() {
   document.getElementById('navDropdown')?.classList.remove('open');
   document.getElementById('menuBlurOverlay')?.classList.remove('on');
   // só libera scroll se não há modal aberto
-  if (!document.querySelector('.modal-overlay.open')) {
+  if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) {
     unlockScroll();
   }
 }
