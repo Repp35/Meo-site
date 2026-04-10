@@ -788,13 +788,15 @@ async function submitRegister(btn) {
     return;
   }
 
+  // login automático após cadastro (sem precisar de confirmação de email)
+  const { error: signInErr } = await _sb.auth.signInWithPassword({ email, password: senha });
   btn.textContent = '✓ Conta criada!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
-  setTimeout(() => {
+  setTimeout(async () => {
     closeModal('modal-register');
     btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
     [nomeEl, emailEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
     clearModalErr(overlay);
-    _loadSession();
+    await _loadSession();
     setTimeout(() => showWelcomeCouponModal(), 600);
   }, 700);
 }
