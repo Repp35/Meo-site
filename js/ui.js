@@ -185,11 +185,17 @@ function showWelcomeCouponModal() {
   if(title)title.textContent=isGuest?'Oferta de boas-vindas':'Cupom ativado!';
   if(sub)sub.textContent=isGuest?'Cadastre-se agora e pague menos. Desconto aplicado automaticamente ao criar sua conta.':'Você ganhou desconto exclusivo de boas-vindas. Os preços já estão com o desconto aplicado para você.';
   if(btn)btn.textContent=isGuest?'Criar conta grátis':'Aproveitar agora';
-  if(el)el.classList.add('open');
+  if(el){ el.classList.add('open'); document.body.style.overflow='hidden'; }
+  // fechar ao clicar fora
+  if(el && !el._wcListener){
+    el._wcListener=true;
+    el.addEventListener('click', e=>{ if(e.target===el) closeWelcomeCouponModal(); });
+  }
 }
 function wcBtnAction() { closeWelcomeCouponModal(); if(!currentUser||currentUser.anon)setTimeout(()=>openModal('modal-register'),180); }
 function closeWelcomeCouponModal() {
   document.getElementById('welcomeCouponModal')?.classList.remove('open');
+  document.body.style.overflow='';
   if(currentUser&&!currentUser.anon) sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{welcome_coupon_used:true}).catch(()=>{});
 }
 
