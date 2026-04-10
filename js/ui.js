@@ -242,20 +242,96 @@ function renderWallet() {
   if(avatar)applyAvatarColors(el,avatar);
 }
 
+// ── AVATAR CROP ──
+let _cropScale=1,_cropMinScale=1,_cropMaxScale=4,_cropX=0,_cropY=0,_cropSrc=null,_cropCallback=null;
+let _cropDragging=false,_cropDragSX=0,_cropDragSY=0,_cropDragOX=0,_cropDragOY=0;
+let _pinching=false,_pinchDist0=0,_pinchScale0=1,_pinchMidX=0,_pinchMidY=0,_pinchX0=0,_pinchY0=0;
+const _CROP_STAGE=260;
+
+function openCropper(src,cb){
+  _cropSrc=src;_cropCallback=cb;
+  const img=document.getElementById('ghost-cropImg');
+  img.onload=()=>{
+    const scaleW=_CROP_STAGE/img.naturalWidth,scaleH=_CROP_STAGE/img.naturalHeight;
+    _cropMinScale=Math.max(scaleW,scaleH);_cropMaxScale=_cropMinScale*4;_cropScale=_cropMinScale;
+    _cropX=(_CROP_STAGE-(img.naturalWidth*_cropScale))/2;_cropY=(_CROP_STAGE-(img.naturalHeight*_cropScale))/2;
+    clampCrop();applyCropTransform();
+  };
+  img.src=src;
+  document.getElementById('ghost-cropOv').classList.add('on');
+  initCropDrag();
+}
+function clampCrop(){
+  const img=document.getElementById('ghost-cropImg');
+  const w=img.naturalWidth*_cropScale,h=img.naturalHeight*_cropScale;
+  if(w<=_CROP_STAGE)_cropX=(_CROP_STAGE-w)/2;else _cropX=Math.min(0,Math.max(_CROP_STAGE-w,_cropX));
+  if(h<=_CROP_STAGE)_cropY=(_CROP_STAGE-h)/2;else _cropY=Math.min(0,Math.max(_CROP_STAGE-h,_cropY));
+}
+function closeCropper(){document.getElementById('ghost-cropOv').classList.remove('on');_cropSrc=null;}
+function applyCropTransform(){
+  const img=document.getElementById('ghost-cropImg');
+  img.style.transform=`translate(${_cropX}px,${_cropY}px) scale(${_cropScale})`;
+  img.style.transformOrigin='0 0';
+}
+function _pinchDist(t){const dx=t[0].clientX-t[1].clientX,dy=t[0].clientY-t[1].clientY;return Math.hypot(dx,dy);}
+function _stageOffset(stage){const r=stage.getBoundingClientRect();return{x:r.left,y:r.top};}
+function initCropDrag(){
+  const stage=document.getElementById('ghost-cropStage');
+  stage.ontouchstart=ev=>{
+    ev.preventDefault();
+    if(ev.touches.length===2){
+      _pinching=true;_cropDragging=false;_pinchDist0=_pinchDist(ev.touches);_pinchScale0=_cropScale;
+      const off=_stageOffset(stage);
+      _pinchMidX=((ev.touches[0].clientX+ev.touches[1].clientX)/2)-off.x;
+      _pinchMidY=((ev.touches[0].clientY+ev.touches[1].clientY)/2)-off.y;
+      _pinchX0=_cropX;_pinchY0=_cropY;
+    }else if(ev.touches.length===1){_pinching=false;_cropDragging=true;_cropDragSX=ev.touches[0].clientX;_cropDragSY=ev.touches[0].clientY;_cropDragOX=_cropX;_cropDragOY=_cropY;}
+  };
+  stage.ontouchmove=ev=>{
+    ev.preventDefault();
+    if(_pinching&&ev.touches.length===2){
+      const dist=_pinchDist(ev.touches);let newScale=_pinchScale0*(dist/_pinchDist0);
+      newScale=Math.max(_cropMinScale,Math.min(_cropMaxScale,newScale));
+      const ratio=newScale/_pinchScale0;_cropX=_pinchMidX+(_pinchX0-_pinchMidX)*ratio;_cropY=_pinchMidY+(_pinchY0-_pinchMidY)*ratio;_cropScale=newScale;clampCrop();applyCropTransform();
+    }else if(_cropDragging&&ev.touches.length===1){
+      _cropX=_cropDragOX+(ev.touches[0].clientX-_cropDragSX);_cropY=_cropDragOY+(ev.touches[0].clientY-_cropDragSY);clampCrop();applyCropTransform();
+    }
+  };
+  stage.ontouchend=ev=>{if(ev.touches.length<2)_pinching=false;if(ev.touches.length===0)_cropDragging=false;};
+  stage.onmousedown=ev=>{ev.preventDefault();_cropDragging=true;_cropDragSX=ev.clientX;_cropDragSY=ev.clientY;_cropDragOX=_cropX;_cropDragOY=_cropY;};
+  window.onmousemove=ev=>{if(!_cropDragging)return;_cropX=_cropDragOX+(ev.clientX-_cropDragSX);_cropY=_cropDragOY+(ev.clientY-_cropDragSY);clampCrop();applyCropTransform();};
+  window.onmouseup=()=>{_cropDragging=false;};
+  stage.onwheel=ev=>{ev.preventDefault();const delta=ev.deltaY>0?-0.05:0.05;const off=_stageOffset(stage);const mx=ev.clientX-off.x,my=ev.clientY-off.y;const newScale=Math.max(_cropMinScale,Math.min(_cropMaxScale,_cropScale*(1+delta)));const ratio=newScale/_cropScale;_cropX=mx+(_cropX-mx)*ratio;_cropY=my+(_cropY-my)*ratio;_cropScale=newScale;clampCrop();applyCropTransform();};
+}
+function confirmCrop(){
+  const img=document.getElementById('ghost-cropImg');
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=260;
+  const ctx=canvas.getContext('2d');ctx.beginPath();ctx.arc(130,130,130,0,Math.PI*2);ctx.clip();
+  ctx.drawImage(img,-_cropX,-_cropY,img.naturalWidth*_cropScale,img.naturalHeight*_cropScale);
+  const dataUrl=canvas.toDataURL('image/jpeg',.92);
+  closeCropper();
+  if(_cropCallback)_cropCallback(dataUrl);
+}
+
 function triggerAvatarUpload() {
   const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
   inp.onchange=e=>{
     const file=e.target.files[0]; if(!file)return;
-    const reader=new FileReader();
-    reader.onload=ev=>{ const img=new Image(); img.onload=async()=>{
-      const MAX=400; let w=img.width,h=img.height;
-      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
-      const canvas=document.createElement('canvas'); canvas.width=w;canvas.height=h; canvas.getContext('2d').drawImage(img,0,0,w,h);
-      const compressed=canvas.toDataURL('image/jpeg',.88);
-      const avatarEl=document.querySelector('.settings-avatar');
-      if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');setTimeout(()=>avatarEl.classList.remove('avatar-swapping'),500);}
-      await setUserAvatar(currentUser.email,compressed); updateNavUser(); renderSettings();
-    }; img.src=ev.target.result; }; reader.readAsDataURL(file);
+    createImageBitmap(file).then(bmp=>{
+      const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;
+      c.getContext('2d').drawImage(bmp,0,0);
+      openCropper(c.toDataURL('image/jpeg',.95), async dataUrl=>{
+        const avatarEl=document.querySelector('.settings-avatar');
+        if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');setTimeout(()=>avatarEl.classList.remove('avatar-swapping'),500);}
+        const res=await fetch(dataUrl); const blob=await res.blob();
+        await setUserAvatar(currentUser.email,blob); updateNavUser(); renderSettings();
+      });
+    }).catch(()=>{
+      const r=new FileReader();r.onload=ev=>openCropper(ev.target.result,async dataUrl=>{
+        const res=await fetch(dataUrl); const blob=await res.blob();
+        await setUserAvatar(currentUser.email,blob); updateNavUser(); renderSettings();
+      });r.readAsDataURL(file);
+    });
   }; inp.click();
 }
 
