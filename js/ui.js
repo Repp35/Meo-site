@@ -14,10 +14,10 @@ function playUpgradeAnimation(oldPlan, newPlan, onDone) {
   const newC = PLAN_COLORS[newPlan] || PLAN_COLORS.premium;
 
   cardOld.innerHTML = `<div class="upg-card-plan" style="color:var(--muted)">Seu plano atual</div><div class="upg-card-name">${oldC.label}</div><div class="upg-card-sub">mudando agora...</div>`;
-  cardOld.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:180px;padding:22px 20px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.12);background:#0d0d1e;`;
+  cardOld.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:180px;padding:22px 20px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.12);background:#100e14;`;
 
   cardNew.innerHTML = `<div class="upg-card-plan" style="background:${newC.grad};-webkit-background-clip:text;background-clip:text;color:transparent">Novo plano</div><div class="upg-card-name">${newC.label}</div><div class="upg-card-sub">desbloqueado!</div>`;
-  cardNew.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.4) rotate(-8deg);width:180px;padding:22px 20px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.18);background:#0d0d1e;opacity:0;box-shadow:0 0 40px ${newC.glow};`;
+  cardNew.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.4) rotate(-8deg);width:180px;padding:22px 20px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.18);background:#100e14;opacity:0;box-shadow:0 0 40px ${newC.glow};`;
 
   label.innerHTML = '';
   particles.innerHTML = '';
@@ -86,9 +86,9 @@ function playDowngradeAnimation(oldPlan, newPlan, onDone) {
   const newC = PLAN_COLORS[newPlan] || PLAN_COLORS.basico;
 
   cardOld.innerHTML = `<div class="upg-card-plan" style="color:var(--muted)">Plano atual</div><div class="upg-card-name" style="background:${oldC.grad};-webkit-background-clip:text;background-clip:text;color:transparent">${oldC.label}</div>`;
-  cardOld.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:180px;padding:22px 20px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.12);background:#0d0d1e;`;
+  cardOld.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:180px;padding:22px 20px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.12);background:#100e14;`;
   cardNew.innerHTML = `<div class="upg-card-plan" style="color:var(--muted)">Novo plano</div><div class="upg-card-name">${newC.label}</div>`;
-  cardNew.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:160px;padding:18px 16px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.1);background:#0d0d1e;opacity:0;`;
+  cardNew.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:160px;padding:18px 16px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.1);background:#100e14;opacity:0;`;
   label.innerHTML = '';
 
   overlay.style.animation = 'upgradeOverlayIn .25s ease both';
@@ -225,7 +225,7 @@ function applyAvatarColors(container, imgSrc) {
   img.onload=()=>{ extractDominantColor(img,color=>{ if(!color)return;
     const ring=container.querySelector('.wallet-avatar,.settings-avatar');
     const nameEl=container.querySelector('.wallet-name');
-    if(ring){ring.style.border='2.5px solid transparent';ring.style.backgroundImage=`linear-gradient(#09091a,#09091a),linear-gradient(135deg,${color},${color} 30%,#a855f7 60%,${color})`;ring.style.backgroundOrigin='border-box';ring.style.backgroundClip='padding-box,border-box';ring.style.animation='gradAni 3s linear infinite';ring.style.backgroundSize='200% 200%';}
+    if(ring){ring.style.border='2.5px solid transparent';ring.style.backgroundImage=`linear-gradient(#100e14,#100e14),linear-gradient(135deg,${color},${color} 30%,#a855f7 60%,${color})`;ring.style.backgroundOrigin='border-box';ring.style.backgroundClip='padding-box,border-box';ring.style.animation='gradAni 3s linear infinite';ring.style.backgroundSize='200% 200%';}
     if(nameEl){nameEl.style.backgroundImage=`linear-gradient(90deg,${color},#a855f7,${color})`;nameEl.style.backgroundSize='300% 100%';nameEl.style.webkitBackgroundClip='text';nameEl.style.backgroundClip='text';nameEl.style.color='transparent';nameEl.style.animation='gradAni 3s linear infinite';}
   }); };
   img.src=imgSrc;
@@ -308,8 +308,9 @@ function confirmCrop(){
   const canvas=document.createElement('canvas');canvas.width=canvas.height=260;
   const ctx=canvas.getContext('2d');
   ctx.beginPath();ctx.arc(130,130,130,0,Math.PI*2);ctx.clip();
+  ctx.translate(_cropX,_cropY);
   ctx.scale(_cropScale,_cropScale);
-  ctx.drawImage(img,_cropX/_cropScale,_cropY/_cropScale);
+  ctx.drawImage(img,0,0);
   const dataUrl=canvas.toDataURL('image/jpeg',.92);
   closeCropper();
   if(_cropCallback)_cropCallback(dataUrl);
@@ -339,7 +340,7 @@ function triggerAvatarUpload() {
         return;
       }
       updateNavUser(); renderSettings();
-      showToast('Foto atualizada!');
+      showToast('Foto atualizada!', 'success');
     };
     // GIF pula o cropper pra preservar a animação
     if(file.type==='image/gif'){
@@ -349,7 +350,7 @@ function triggerAvatarUpload() {
       setUserAvatar(currentUser.email,file).then(()=>{
         if(window._avatarUploadError){showToast('Erro ao salvar foto: '+window._avatarUploadError,'error');return;}
         if(!currentUser.avatar_url){showToast('Erro ao salvar foto. Verifique bucket "avatars" no Supabase.','error');return;}
-        updateNavUser();renderSettings();showToast('Foto animada salva! 🎉');
+        updateNavUser();renderSettings();showToast('Foto animada salva!', 'success');
       });
       return;
     }
@@ -378,17 +379,55 @@ function removeAvatar() {
     if(currentUser)currentUser.avatar_url=null;
     await sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{avatar_url:null});
     updateNavUser();renderSettings();
-    showToast('Foto removida!');
+    showToast('Foto removida!', 'info');
   },220);
 }
 
 // HISTÓRICO + SETTINGS
 function showToast(msg, type='success') {
-  const t=document.createElement('div');
-  t.style.cssText=`position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${type==='error'?'#c0392b':'var(--p)'};color:#fff;padding:10px 20px;border-radius:99px;font-size:.82rem;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4);pointer-events:none;opacity:1;transition:opacity .4s`;
-  t.textContent=msg;
-  document.body.appendChild(t);
-  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),400);},3000);
+  // ícones SVG por tipo
+  const icons = {
+    success: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+    error:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+    info:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+  };
+  const colors = {
+    success: { bg:'rgba(34,197,94,.13)', border:'rgba(34,197,94,.28)', icon:'#22c55e', bar:'#22c55e' },
+    error:   { bg:'rgba(248,113,113,.13)', border:'rgba(248,113,113,.28)', icon:'#f87171', bar:'#f87171' },
+    info:    { bg:'rgba(168,85,247,.13)', border:'rgba(168,85,247,.28)', icon:'#a855f7', bar:'#a855f7' },
+  };
+  const c = colors[type] || colors.success;
+  const ic = icons[type] || icons.success;
+  const DURATION = 3200;
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);z-index:9999;pointer-events:none;opacity:0;transition:opacity .22s ease,transform .28s cubic-bezier(.34,1.4,.64,1);min-width:200px;max-width:88vw`;
+
+  wrap.innerHTML = `
+    <div style="position:relative;background:#0e0e1f;border:1px solid ${c.border};border-radius:14px;padding:11px 16px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04);backdrop-filter:blur(12px);overflow:hidden">
+      <div style="width:28px;height:28px;border-radius:50%;background:${c.bg};border:1px solid ${c.border};display:flex;align-items:center;justify-content:center;flex-shrink:0;color:${c.icon}">${ic}</div>
+      <span style="font-size:.82rem;font-weight:600;color:#fff;line-height:1.35;flex:1">${msg}</span>
+      <div style="position:absolute;bottom:0;left:0;height:2.5px;width:100%;background:${c.bar};border-radius:0 0 14px 14px;transform-origin:left;animation:__toastBar ${DURATION}ms linear forwards"></div>
+    </div>`;
+
+  // inject keyframe once
+  if (!document.getElementById('__toastBarKf')) {
+    const s = document.createElement('style');
+    s.id = '__toastBarKf';
+    s.textContent = `@keyframes __toastBar{from{transform:scaleX(1)}to{transform:scaleX(0)}}`;
+    document.head.appendChild(s);
+  }
+
+  document.body.appendChild(wrap);
+  requestAnimationFrame(() => {
+    wrap.style.opacity = '1';
+    wrap.style.transform = 'translateX(-50%) translateY(0)';
+  });
+  setTimeout(() => {
+    wrap.style.opacity = '0';
+    wrap.style.transform = 'translateX(-50%) translateY(10px)';
+    setTimeout(() => wrap.remove(), 350);
+  }, DURATION);
 }
 
 function goHistory() { pushNav('history'); renderHistory(); showPage('history'); }
@@ -463,7 +502,7 @@ function renderSettings() {
   const credBal=getCredits(currentUser.email),credBrl=creditsToReal(credBal).toFixed(2).replace('.',',');
   const credCard=credBal>0?`<div class="settings-card"><div class="settings-card-title">Créditos avulsos</div><div class="settings-row"><span class="settings-row-label">Saldo</span><span class="settings-row-val" style="font-weight:700;background:var(--grad-text);background-size:400% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 4s linear infinite">${credBrl}</span></div><div class="settings-row"><span class="settings-row-label">Créditos</span><span class="settings-row-val">${credBal} créditos</span></div><div class="settings-row" style="padding:10px 16px"><button onclick="goCreditsInfo(null,true)" style="font-size:.72rem;font-weight:600;color:var(--muted2);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:5px 14px;border-radius:99px;transition:all .15s" onmouseover="this.style.color='var(--fg)'" onmouseout="this.style.color='var(--muted2)'">Comprar mais →</button></div></div>`:`<div class="settings-card"><div class="settings-card-title">Créditos avulsos</div><div class="settings-row" style="padding:12px 16px;flex-direction:column;gap:8px;align-items:flex-start"><span style="font-size:.78rem;color:var(--muted)">Sem créditos. Use para consultas avulsas sem precisar de plano.</span><button onclick="goCreditsInfo(null,true)" style="font-size:.72rem;font-weight:600;color:var(--p3);background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);padding:5px 14px;border-radius:99px;transition:all .15s">Ver créditos →</button></div></div>`;
   const avatarSrc=getUserAvatar(currentUser.email);
-  el.innerHTML=`${expiryBanner}<div class="settings-card"><div class="settings-card-title">Perfil</div><div class="settings-avatar-wrap"><div class="settings-avatar" onclick="triggerAvatarUpload()" style="cursor:pointer" title="Trocar foto">${avatarSrc?`<img src="${avatarSrc}" alt="avatar">`:`<span>${currentUser.name[0].toUpperCase()}</span>`}</div><div class="settings-avatar-info"><div class="settings-avatar-name">${currentUser.name}</div><button onclick="triggerAvatarUpload()" class="btn-trocar-foto">Trocar foto</button>${avatarSrc?`<button onclick="removeAvatar()" style="margin-top:4px;margin-left:6px;font-size:.7rem;font-weight:500;color:var(--muted);background:rgba(255,255,255,.05);padding:4px 12px;border-radius:99px;border:1px solid var(--border);transition:all .15s">Remover</button>`:''}</div></div><div class="settings-row"><span class="settings-row-label">E-mail</span><span class="settings-row-val" style="-webkit-user-select:text;user-select:text">${currentUser.email}</span></div><div class="settings-row"><span class="settings-row-label">Plano</span><span class="settings-plan-badge ${planClass}">${limits.label}</span></div>${expiryHtml}</div>${credCard}<div class="settings-card"><div class="settings-card-title">Editar dados</div><div class="settings-row" style="flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px"><div><label class="modal-label" style="margin-bottom:5px;display:block">Nome</label><input id="set-nome" class="modal-input" type="text" value="${currentUser.name}" placeholder="Seu nome" style="width:100%"></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Nova senha</label><div class="modal-input-wrap"><input id="set-senha" class="modal-input" type="password" placeholder="Mínimo 5 caracteres" style="width:100%;padding-right:42px"><button class="modal-eye" onclick="togglePw('set-senha','set-senha-eye')" id="set-senha-eye"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Confirmar senha</label><input id="set-conf" class="modal-input" type="password" placeholder="Repita a nova senha" style="width:100%"></div><div id="set-msg" class="set-msg"></div><button class="modal-submit" onclick="saveProfileChanges()" style="margin-top:2px">Salvar alterações</button></div></div><div class="settings-card"><div class="usage-toggle-btn" onclick="toggleUsageDetail()"><span class="settings-card-title" style="border-bottom:none;padding:0">Uso hoje — ${todayStr()}</span><span class="usage-toggle-label"><span id="usageArrow" class="usage-toggle-arrow">▼</span> ver detalhes</span></div><div class="settings-row"><span class="settings-row-label">Total geral</span><div class="settings-progress-wrap"><span class="settings-progress-txt">${totalUsed} / ${totalLim}</span>${limits.total!==999?`<div class="settings-progress-bar"><div class="settings-progress-fill" style="width:${Math.min(100,(totalUsed/limits.total)*100)}%"></div></div>`:''}</div></div><div id="usageDetail" style="max-height:0;overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1)">${modRows}</div></div><div class="settings-card"><div class="settings-card-title">Preferências</div><div class="settings-row"><span class="settings-row-label">Cursor personalizado</span><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:.72rem;color:var(--muted)" id="cursorToggleLbl">${LS.get('ghost_cursor_enabled')!==false?'Ativado':'Desativado'}</span><div onclick="toggleCursorPref(this)" style="width:38px;height:22px;border-radius:99px;background:${LS.get('ghost_cursor_enabled')!==false?'var(--p)':'rgba(255,255,255,.12)'};position:relative;transition:background .2s;flex-shrink:0" id="cursorToggle"><div style="position:absolute;top:3px;left:${LS.get('ghost_cursor_enabled')!==false?'19px':'3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)" id="cursorToggleThumb"></div></div></label></div></div><div class="settings-card"><div class="settings-card-title">Conta</div><div class="settings-row" style="padding:16px"><button class="btn-logout" onclick="logoutUser()">Sair da conta</button></div></div>`;
+  el.innerHTML=`${expiryBanner}<div class="settings-card"><div class="settings-card-title">Perfil</div><div class="settings-avatar-wrap"><div class="settings-avatar" onclick="triggerAvatarUpload()" style="cursor:pointer" title="Trocar foto">${avatarSrc?`<img src="${avatarSrc}" alt="avatar">`:`<span>${currentUser.name[0].toUpperCase()}</span>`}</div><div class="settings-avatar-info"><div class="settings-avatar-name">${currentUser.name}</div><button onclick="triggerAvatarUpload()" class="btn-trocar-foto">Trocar foto</button>${avatarSrc?`<button onclick="removeAvatar()" style="margin-top:4px;margin-left:6px;font-size:.7rem;font-weight:500;color:var(--muted);background:rgba(255,255,255,.05);padding:4px 12px;border-radius:99px;border:1px solid var(--border);transition:all .15s">Remover</button>`:''}</div></div><div class="settings-row"><span class="settings-row-label">E-mail</span><span class="settings-row-val" style="-webkit-user-select:text;user-select:text">${currentUser.email}</span></div><div class="settings-row"><span class="settings-row-label">Plano</span><span class="settings-plan-badge ${planClass}">${limits.label}</span></div>${expiryHtml}</div>${credCard}<div class="settings-card"><div class="settings-card-title">Editar dados</div><div class="settings-row" style="flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px"><div><label class="modal-label" style="margin-bottom:5px;display:block">Nome</label><input id="set-nome" class="modal-input" type="text" value="${currentUser.name}" placeholder="Seu nome" autocomplete="name" style="width:100%"></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Nova senha</label><div class="modal-input-wrap"><input id="set-senha" class="modal-input" type="password" placeholder="Mínimo 5 caracteres" autocomplete="new-password" style="width:100%;padding-right:42px"><button class="modal-eye" onclick="togglePw('set-senha','set-senha-eye')" id="set-senha-eye"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Confirmar senha</label><input id="set-conf" class="modal-input" type="password" placeholder="Repita a nova senha" autocomplete="new-password" style="width:100%"></div><div id="set-msg" class="set-msg"></div><button class="modal-submit" onclick="saveProfileChanges()" style="margin-top:2px">Salvar alterações</button></div></div><div class="settings-card"><div class="usage-toggle-btn" onclick="toggleUsageDetail()"><span class="settings-card-title" style="border-bottom:none;padding:0">Uso hoje — ${todayStr()}</span><span class="usage-toggle-label"><span id="usageArrow" class="usage-toggle-arrow">▼</span> ver detalhes</span></div><div class="settings-row"><span class="settings-row-label">Total geral</span><div class="settings-progress-wrap"><span class="settings-progress-txt">${totalUsed} / ${totalLim}</span>${limits.total!==999?`<div class="settings-progress-bar"><div class="settings-progress-fill" style="width:${Math.min(100,(totalUsed/limits.total)*100)}%"></div></div>`:''}</div></div><div id="usageDetail" style="max-height:0;overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1)">${modRows}</div></div><div class="settings-card"><div class="settings-card-title">Preferências</div><div class="settings-row"><span class="settings-row-label">Cursor personalizado</span><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:.72rem;color:var(--muted)" id="cursorToggleLbl">${LS.get('ghost_cursor_enabled')!==false?'Ativado':'Desativado'}</span><div onclick="toggleCursorPref(this)" style="width:38px;height:22px;border-radius:99px;background:${LS.get('ghost_cursor_enabled')!==false?'var(--p)':'rgba(255,255,255,.12)'};position:relative;transition:background .2s;flex-shrink:0" id="cursorToggle"><div style="position:absolute;top:3px;left:${LS.get('ghost_cursor_enabled')!==false?'19px':'3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)" id="cursorToggleThumb"></div></div></label></div></div><div class="settings-card"><div class="settings-card-title">Conta</div><div class="settings-row" style="padding:16px"><button class="btn-logout" onclick="logoutUser()">Sair da conta</button></div></div>`;
 }
 
 function toggleCursorPref(toggle) {
