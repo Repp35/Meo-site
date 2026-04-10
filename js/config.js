@@ -72,7 +72,6 @@ const CHAT_MAX_PER_MIN   = 10;
       document.querySelector('.modal-overlay.open') ||
       document.querySelector('.confirm-overlay.open') ||
       document.querySelector('.csb-confirm-overlay.open') ||
-      document.getElementById('navDropdown')?.classList.contains('open')
     );
   }
 
