@@ -485,7 +485,7 @@ input::placeholder{color:rgba(148,163,184,.25)}
 .store-logo-store{background:linear-gradient(90deg,#b06ef3,#c084fc,#d8a8f0,#e89fc8,#c084fc,#b06ef3);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 6s linear infinite}
 .store-count{font-size:.75rem;color:var(--muted)}
 .store-count.pop{animation:countPop .22s ease both}
-.store-search-row{display:flex;gap:10px;width:100%;max-width:680px;padding:12px 24px 0}
+.store-search-row{display:flex;gap:10px;width:100%;max-width:680px;padding:12px 24px 0;margin:0 auto}
 .store-search{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:var(--r);padding:11px 16px;color:var(--fg);font-size:.875rem;font-family:inherit;transition:all .15s}
 .store-search::placeholder{color:rgba(148,163,184,.25)}
 .store-search:focus{outline:none;border-color:rgba(168,85,247,.4);background:rgba(255,255,255,.07)}
@@ -1494,7 +1494,7 @@ html{height:-webkit-fill-available}
 .nav-menu-btn.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
 .nav-menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
 .nav-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
-.nav-dropdown{position:fixed;top:60px;left:0;right:0;z-index:250;background:rgba(10,10,18,.97);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);overflow:hidden;max-height:0;transition:max-height .32s cubic-bezier(.4,0,.2,1),opacity .25s,visibility .25s;opacity:0;visibility:hidden;pointer-events:none}
+.nav-dropdown{position:fixed;top:60px;left:0;right:0;z-index:250;background:rgba(8,8,16,.88);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;max-height:0;transition:max-height .2s cubic-bezier(.4,0,.2,1),opacity .15s ease,visibility .15s;opacity:0;visibility:hidden;pointer-events:none}
 .nav-dropdown.open{max-height:680px;opacity:1;visibility:visible;pointer-events:all}
 .menu-blur-overlay{position:fixed;inset:0;top:60px;z-index:249;background:rgba(8,8,15,.4);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .25s}
 .menu-blur-overlay.on{opacity:1;pointer-events:all}
