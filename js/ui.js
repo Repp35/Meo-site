@@ -188,7 +188,7 @@ function showWelcomeCouponModal() {
   if(title)title.textContent=isGuest?'Oferta de boas-vindas':'Cupom ativado!';
   if(sub)sub.textContent=isGuest?'Cadastre-se agora e pague menos. Desconto aplicado automaticamente ao criar sua conta.':'Você ganhou desconto exclusivo de boas-vindas. Os preços já estão com o desconto aplicado para você.';
   if(btn){btn.textContent=isGuest?'Criar conta grátis':'Aproveitar agora';btn.onclick=isGuest?wcBtnAction:closeWelcomeCouponModal;}
-  if(el){ el.classList.add('open'); }
+  if(el){ el.classList.add('open'); document.body.style.overflow='hidden'; }
   // fechar ao clicar fora
   if(el && !el._wcListener){
     el._wcListener=true;
@@ -198,6 +198,7 @@ function showWelcomeCouponModal() {
 function wcBtnAction() { closeWelcomeCouponModal(); if(!currentUser||currentUser.anon)setTimeout(()=>openModal('modal-register'),180); }
 function closeWelcomeCouponModal() {
   document.getElementById('welcomeCouponModal')?.classList.remove('open');
+  document.body.style.overflow='';
   if(currentUser&&!currentUser.anon) sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{welcome_coupon_used:true}).catch(()=>{});
 }
 
@@ -402,7 +403,7 @@ function showToast(msg, type='success') {
 
 function goHistory() { pushNav('history'); renderHistory(); showPage('history'); }
 function goSettings() { pushNav('settings'); renderSettings(); showPage('settings'); }
-function goUpgradePage() { goPlansFromResults(); closeMenu(); }
+function goUpgradePage() { goPlansFromResults(); }
 
 function updateMiniBalloon(mod) {
   const el=document.getElementById('qMiniBalloon'), txt=document.getElementById('qMiniBalloonTxt');
@@ -720,7 +721,7 @@ detectDevice();window.addEventListener('resize',detectDevice);
 })();
 
 // ── FIX OVERFLOW SCROLL ──
-document.body.style.overflow='';
+document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend',()=>{if(!document.querySelector('.modal-overlay.open'))document.body.style.overflow='';});});
 
 // TILT 3D — CARDS DE CRÉDITO
 (function(){
@@ -790,8 +791,6 @@ document.body.style.overflow='';
 
   grid.addEventListener('touchmove',e=>{
     if(!active||e.touches.length>1)return;
-    const rect=grid.getBoundingClientRect();
-    if(rect.bottom<0||rect.top>window.innerHeight){active=false;return;}
     const dx=e.touches[0].clientX-startX;
     const dy=e.touches[0].clientY-startY;
     // decide direção no primeiro movimento significativo
