@@ -79,7 +79,8 @@ window.sbDeleteAvatar = async function(path) {
 
 window.sbUploadAvatar = async function(email, blob) {
   try {
-    const ext  = blob.type === 'image/png' ? 'png' : 'jpg';
+    const extMap = {'image/png':'png','image/gif':'gif','image/webp':'webp'};
+    const ext = extMap[blob.type] || 'jpg';
     const path = `${email.replace(/[^a-z0-9]/gi,'_')}.${ext}`;
     await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${path}`, {
       method: 'DELETE', headers: await getAuthHeaders()
