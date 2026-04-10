@@ -14,10 +14,11 @@ const LS = {
   del:  k => { try { localStorage.removeItem(k); } catch {} },
 };
 
-// ── sessão: email salvo em localStorage como referência ──
-function getSession()        { return LS.get('ghost_session'); }
-function saveSession(email)  { LS.set('ghost_session', { email }); }
-function clearSession()      { LS.del('ghost_session'); }
+// ── sessão: gerenciada pelo Supabase Auth (JWT automático) ──
+async function getAuthSession()  { const { data: { session } } = await _sb.auth.getSession(); return session; }
+async function getAuthUser()     { const { data: { user } } = await _sb.auth.getUser(); return user; }
+function saveSession()  {} // mantido por compatibilidade — não faz mais nada
+function clearSession() {} // mantido por compatibilidade — não faz mais nada
 
 // ── HELPERS DE CRÉDITOS ──
 function getCredits(email) {
@@ -29,7 +30,12 @@ function setCredits(email, val) {
   if (!email) return;
   const v = Math.max(0, Math.round(val * 100) / 100);
   if (currentUser && currentUser.email === email) currentUser._credits = v;
-  sbPatch('users', `email=eq.${encodeURIComponent(email)}`, { credits: v }).catch(()=>{});
+  // usa uid do currentUser se disponível, senão busca via session
+  (async () => {
+    const session = await getAuthSession();
+    if (!session) return;
+    sbPatch('profiles', `id=eq.${session.user.id}`, { creditos: v }).catch(()=>{});
+  })();
 }
 function addCredits(email, val) { setCredits(email, getCredits(email) + val); }
 function deductCredits(email, val) { setCredits(email, getCredits(email) - val); }
@@ -56,7 +62,8 @@ async function setUserAvatar(email, base64OrBlob) {
     url = await sbUploadAvatar(email, blob);
   }
   if (url) {
-    await sbPatch('users', `email=eq.${encodeURIComponent(email)}`, { avatar_url: url });
+    const _s = await getAuthSession();
+    if (_s) await sbPatch('profiles', `id=eq.${_s.user.id}`, { avatar_url: url });
     if (currentUser && currentUser.email === email) currentUser.avatar_url = url;
   }
 }
@@ -764,26 +771,19 @@ async function submitRegister(btn) {
   const orig = btn.textContent;
   btn.textContent = 'Criando conta...'; btn.style.opacity = '.7'; btn.disabled = true;
 
-  // verifica se email já existe
-  const existing = await sbGetOne('users', `email=eq.${encodeURIComponent(email)}`);
-  if (existing) {
-    emailEl.style.borderColor = 'rgba(248,113,113,.6)';
-    showModalErr(overlay, 'Este e-mail já está cadastrado.');
-    btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
-    return;
-  }
-
-  const newUser = await sbPost('users', {
-    email, nome, senha, plan: 'basico', credits: 0, welcome_coupon_used: false
+  const { error: signUpErr } = await _sb.auth.signUp({
+    email,
+    password: senha,
+    options: { data: { nome } }
   });
 
-  if (!newUser) {
-    showModalErr(overlay, 'Erro ao criar conta. Tente novamente.');
+  if (signUpErr) {
+    const jaExiste = signUpErr.message?.toLowerCase().includes('already registered');
+    if (jaExiste) emailEl.style.borderColor = 'rgba(248,113,113,.6)';
+    showModalErr(overlay, jaExiste ? 'Este e-mail já está cadastrado.' : 'Erro ao criar conta. Tente novamente.');
     btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
     return;
   }
-
-  saveSession(email);
 
   btn.textContent = '✓ Conta criada!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
   setTimeout(() => {
@@ -816,27 +816,49 @@ async function submitLogin(btn) {
   const orig = btn.textContent;
   btn.textContent = 'Entrando...'; btn.style.opacity = '.7'; btn.disabled = true;
 
-  // busca por email ou nome
-  let user = await sbGetOne('users', `email=eq.${encodeURIComponent(identifier)}`);
-  if (!user) {
-    const byName = await sbGet('users', `nome=ilike.${encodeURIComponent(identifier)}&limit=1`);
-    user = byName?.[0] || null;
+  // login via Supabase Auth
+  let loginEmail = identifier;
+
+  // se não parece email, tenta achar pelo nome na tabela profiles
+  if (!identifier.includes('@')) {
+    const byName = await sbGet('profiles', `nome=ilike.${encodeURIComponent(identifier)}&limit=1`);
+    const profile = byName?.[0] || null;
+    if (!profile) {
+      btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
+      [identEl, senhaEl].forEach(i => i.style.borderColor = 'rgba(248,113,113,.6)');
+      showModalErr(overlay, 'Usuário ou senha incorretos.');
+      return;
+    }
+    // pega o email do auth.users pelo id do profile
+    const { data: { user: authUser } } = await _sb.auth.admin?.getUserById?.(profile.id) || { data: {} };
+    if (!authUser?.email) {
+      btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
+      showModalErr(overlay, 'Usuário ou senha incorretos.');
+      return;
+    }
+    loginEmail = authUser.email;
   }
 
-  if (!user || user.senha !== senha) {
+  const { data: signInData, error: signInErr } = await _sb.auth.signInWithPassword({
+    email: loginEmail,
+    password: senha,
+  });
+
+  if (signInErr) {
     btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
     [identEl, senhaEl].forEach(i => i.style.borderColor = 'rgba(248,113,113,.6)');
     showModalErr(overlay, 'Usuário ou senha incorretos.');
     return;
   }
 
-  if (user.banned) {
+  // verifica se está banido
+  const profile = await sbGetOne('profiles', `id=eq.${signInData.user.id}`);
+  if (profile?.banned) {
+    await _sb.auth.signOut();
     btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
     showModalErr(overlay, 'Conta suspensa. Entre em contato com o suporte.');
     return;
   }
-
-  saveSession(user.email);
 
   btn.textContent = '✓ Bem-vindo!'; btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
   setTimeout(async () => {
@@ -861,44 +883,43 @@ function clearModalErr(overlay) {
 
 // ── carrega sessão salva ao iniciar ──
 async function _loadSession() {
-  const sess = getSession();
-  if (!sess?.email) { initAnon(); updateNavUser(); return; }
-
-  // aguarda o banco sem mostrar como visitante (evita flicker)
-
   try {
-    const user = await sbGetOne('users', `email=eq.${encodeURIComponent(sess.email)}`);
+    const session = await getAuthSession();
+    if (!session) { initAnon(); updateNavUser(); return; }
 
-    if (!user) {
-      // usuário não existe mais no banco — limpa sessão, fica como visitante
-      clearSession();
+    const uid = session.user.id;
+    const email = session.user.email;
+
+    const profile = await sbGetOne('profiles', `id=eq.${uid}`);
+
+    if (!profile) {
+      await _sb.auth.signOut();
       initAnon();
       updateNavUser();
       return;
     }
 
     // verifica expiração do plano
-    if (user.plan_expires_at && Date.now() > new Date(user.plan_expires_at).getTime() && user.plan !== 'basico') {
-      await sbPatch('users', `email=eq.${encodeURIComponent(user.email)}`, { plan: 'basico', plan_expires_at: null });
-      user.plan = 'basico';
-      user.plan_expires_at = null;
+    if (profile.plan_expires_at && Date.now() > new Date(profile.plan_expires_at).getTime() && profile.plano !== 'basico') {
+      await sbPatch('profiles', `id=eq.${uid}`, { plano: 'basico', plan_expires_at: null });
+      profile.plano = 'basico';
+      profile.plan_expires_at = null;
     }
 
-    queryCounters = await getDailyCounters(user.email, user.plan);
+    queryCounters = await getDailyCounters(email, profile.plano);
 
     currentUser = {
-      name:          user.nome,
-      email:         user.email,
-      plan:          user.plan,
-      planExpiresAt: user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : null,
-      avatar_url:    user.avatar_url || null,
-      _credits:      user.credits || 0,
+      name:          profile.nome,
+      email:         email,
+      plan:          profile.plano,
+      planExpiresAt: profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : null,
+      avatar_url:    profile.avatar_url || null,
+      _credits:      profile.creditos || 0,
     };
 
     updateNavUser();
 
   } catch {
-    // erro de rede — fica como visitante, sessão permanece salva pra próxima tentativa
     initAnon();
     updateNavUser();
   }
@@ -948,10 +969,19 @@ async function _doSaveProfile() {
   const newNome  = nomeEl?.value.trim();
   const newSenha = senhaEl?.value;
 
-  const patch = { nome: newNome };
-  if (newSenha) patch.senha = newSenha;
+  const session = await getAuthSession();
+  if (!session) return;
+  const uid = session.user.id;
 
-  const updated = await sbPatch('users', `email=eq.${encodeURIComponent(currentUser.email)}`, patch);
+  if (newSenha) {
+    const { error: pwErr } = await _sb.auth.updateUser({ password: newSenha });
+    if (pwErr) {
+      if (msgEl) { msgEl.textContent = 'Erro ao atualizar senha.'; msgEl.className = 'set-msg err'; }
+      return;
+    }
+  }
+
+  const updated = await sbPatch('profiles', `id=eq.${uid}`, { nome: newNome });
   if (!updated) {
     if (msgEl) { msgEl.textContent = 'Erro ao salvar. Tente novamente.'; msgEl.className = 'set-msg err'; }
     return;
@@ -1177,22 +1207,25 @@ async function loginUser(name, email, plan, days) {
   let expiresAt = null;
   if (days && days > 0) {
     // se já tem plano igual, estende
-    const existing = await sbGetOne('users', `email=eq.${encodeURIComponent(email)}`);
-    if (existing && existing.plan === plan && plan !== 'basico' && existing.plan_expires_at) {
-      const current = new Date(existing.plan_expires_at).getTime();
-      expiresAt = new Date(Math.max(current, Date.now()) + days * 86400000).toISOString();
+    const session = await getAuthSession();
+    if (session) {
+      const existing = await sbGetOne('profiles', `id=eq.${session.user.id}`);
+      if (existing && existing.plano === plan && plan !== 'basico' && existing.plan_expires_at) {
+        const current = new Date(existing.plan_expires_at).getTime();
+        expiresAt = new Date(Math.max(current, Date.now()) + days * 86400000).toISOString();
+      } else {
+        expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+      }
     } else {
       expiresAt = new Date(Date.now() + days * 86400000).toISOString();
     }
   }
 
-  const patch = { plan };
+  const patch = { plano: plan, plan_expires_at: expiresAt };
   if (name && name !== 'Usuário') patch.nome = name;
-  patch.plan_expires_at = expiresAt;
 
-  await sbPatch('users', `email=eq.${encodeURIComponent(email)}`, patch);
-
-  saveSession(email);
+  const session2 = await getAuthSession();
+  if (session2) await sbPatch('profiles', `id=eq.${session2.user.id}`, patch);
   currentUser = { ...currentUser, name: name || currentUser?.name, email, plan, planExpiresAt: expiresAt ? new Date(expiresAt).getTime() : null };
   queryCounters = await getDailyCounters(email, plan);
   updateNavUser();
@@ -1207,8 +1240,8 @@ async function loginUser(name, email, plan, days) {
 function logoutUser() {
   document.getElementById('confirmLogout').classList.add('open');
 }
-function _doLogout() {
-  clearSession();
+async function _doLogout() {
+  await _sb.auth.signOut();
   currentUser = null;
   queryCounters = {};
   activeCoupon = null;
