@@ -351,9 +351,15 @@ function removeAvatar() {
   const avatarEl=document.querySelector('.settings-avatar');
   if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');}
   setTimeout(async()=>{
+    // deleta do Storage (tenta jpg e png)
+    const base=currentUser.email.replace(/[^a-z0-9]/gi,'_');
+    for(const ext of ['jpg','png']){
+      await sbDeleteAvatar(`${base}.${ext}`);
+    }
     if(currentUser)currentUser.avatar_url=null;
     await sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{avatar_url:null});
     updateNavUser();renderSettings();
+    showToast('Foto removida!');
   },220);
 }
 
