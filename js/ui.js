@@ -308,9 +308,8 @@ function confirmCrop(){
   const canvas=document.createElement('canvas');canvas.width=canvas.height=260;
   const ctx=canvas.getContext('2d');
   ctx.beginPath();ctx.arc(130,130,130,0,Math.PI*2);ctx.clip();
-  ctx.translate(_cropX,_cropY);
   ctx.scale(_cropScale,_cropScale);
-  ctx.drawImage(img,0,0);
+  ctx.drawImage(img,_cropX/_cropScale,_cropY/_cropScale);
   const dataUrl=canvas.toDataURL('image/jpeg',.92);
   closeCropper();
   if(_cropCallback)_cropCallback(dataUrl);
