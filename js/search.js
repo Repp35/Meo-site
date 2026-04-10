@@ -504,6 +504,7 @@ async function _runSearch(useCredits = false) {
       histAdd({ type:'consulta', name:`${MODS[curMod]?.name || curMod} — ${val}`, free: cost === 0 || !useCredits, value: useCredits ? creditsToReal(cost).toFixed(2) : null });
     }
     stepSet(3,'done'); hideLd(); pushNav('results'); renderResults(res);
+    if (res && res.length > 0) showToast('Consulta realizada!', 'success');
     updateResultsBanner(curMod);
   }catch(e){ hideLd(); renderErr('Erro inesperado','Verifique sua conexão e tente novamente.'); }
 }
