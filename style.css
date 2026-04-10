@@ -1481,3 +1481,29 @@ html{height:-webkit-fill-available}
 }
 /* respeita delay individual via style="--fd:Xs" */
 .scroll-fade { transition-delay: var(--fd, 0s); }
+
+/* ── AVATAR CROPPER ── */
+.ghost-crop-ov {
+  position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.ghost-crop-ov.on { opacity:1;pointer-events:all; }
+.ghost-crop-title { font-size:16px;font-weight:500;color:#fff;margin-bottom:16px; }
+.ghost-crop-stage {
+  position:relative;width:260px;height:260px;overflow:hidden;
+  border-radius:50%;background:#000;flex-shrink:0;touch-action:none;
+}
+.ghost-crop-img { position:absolute;transform-origin:0 0;cursor:grab;user-select:none;-webkit-user-drag:none; }
+.ghost-crop-img:active { cursor:grabbing; }
+.ghost-crop-circle {
+  position:absolute;inset:0;pointer-events:none;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.55);border-radius:50%;border:2px solid rgba(255,255,255,.4);
+}
+.ghost-crop-btns { display:flex;gap:12px;margin-top:20px;width:260px; }
+.ghost-crop-btns button {
+  flex:1;padding:13px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;transition:.12s;border:none;
+}
+.ghost-crop-cancel { background:rgba(255,255,255,.12);color:#fff; }
+.ghost-crop-confirm { background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff; }
+.ghost-crop-confirm:active,.ghost-crop-cancel:active { opacity:.8; }
