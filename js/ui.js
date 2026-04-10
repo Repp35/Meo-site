@@ -770,13 +770,63 @@ document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend
   function goTo(i){i=Math.max(0,Math.min(N-1,i));cur=i;targetX=snapX(i);updateCards(i);closeAllPlanDetails();startRaf();}
   function goToInstant(i){i=Math.max(0,Math.min(N-1,i));cur=i;currentX=targetX=snapX(i);grid.style.transform=`translateX(${currentX}px)`;updateCards(i);}
   function startRaf(){if(rafId)cancelAnimationFrame(rafId);function tick(){const diff=targetX-currentX;if(Math.abs(diff)<0.1){currentX=targetX;grid.style.transform=`translateX(${currentX}px)`;rafId=null;return;}currentX+=diff*LERP;grid.style.transform=`translateX(${currentX}px)`;rafId=requestAnimationFrame(tick);}rafId=requestAnimationFrame(tick);}
-  let active=false,startX=0,rawDelta=0;
+  let active=false,startX=0,startY=0,rawDelta=0;
+  let _touchDir=null; // 'h' horizontal | 'v' vertical | null ainda não decidiu
+
   function onStart(clientX){active=true;rawDelta=0;startX=clientX;if(rafId){cancelAnimationFrame(rafId);rafId=null;}grid.classList.add('dragging');}
   function onMove(clientX){if(!active)return;rawDelta=clientX-startX;if(Math.abs(rawDelta)>8)_planDragHappened=true;const atStart=cur===0&&rawDelta>0,atEnd=cur===N-1&&rawDelta<0;let visual;if(atStart||atEnd){visual=snapX(cur)+rubberClamp(rawDelta,true);}else{visual=snapX(cur)+rawDelta*0.6;}const minX=snapX(N-1)-cardW()*0.3,maxX=snapX(0)+cardW()*0.3;visual=Math.max(minX,Math.min(maxX,visual));grid.style.transform=`translateX(${visual}px)`;currentX=visual;}
   function onEnd(){if(!active)return;active=false;grid.classList.remove('dragging');const atStart=cur===0&&rawDelta>0,atEnd=cur===N-1&&rawDelta<0;if(!atStart&&!atEnd&&rawDelta<-THRESHOLD)goTo(cur+1);else if(!atStart&&!atEnd&&rawDelta>THRESHOLD)goTo(cur-1);else goTo(cur);}
+
   grid.addEventListener('mousedown',e=>onStart(e.clientX));window.addEventListener('mousemove',e=>onMove(e.clientX));window.addEventListener('mouseup',onEnd);
-  grid.addEventListener('touchstart',e=>onStart(e.touches[0].clientX),{passive:true});grid.addEventListener('touchmove',e=>onMove(e.touches[0].clientX),{passive:true});
-  grid.addEventListener('touchend',()=>{onEnd();_planDetailLocked=true;setTimeout(()=>{_planDetailLocked=false;},700);},{passive:true});
+
+  // touch com detecção de direção
+  grid.addEventListener('touchstart',e=>{
+    if(e.touches.length>1)return;
+    _touchDir=null;
+    startX=e.touches[0].clientX;
+    startY=e.touches[0].clientY;
+    rawDelta=0;
+    active=true;
+    if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+  },{passive:true});
+
+  grid.addEventListener('touchmove',e=>{
+    if(!active||e.touches.length>1)return;
+    const dx=e.touches[0].clientX-startX;
+    const dy=e.touches[0].clientY-startY;
+    // decide direção no primeiro movimento significativo
+    if(!_touchDir){
+      if(Math.abs(dx)<4&&Math.abs(dy)<4)return;
+      _touchDir=Math.abs(dx)>=Math.abs(dy)?'h':'v';
+    }
+    if(_touchDir==='v')return; // deixa o scroll nativo rolar
+    e.preventDefault(); // horizontal: trava scroll e move carrossel
+    rawDelta=dx;
+    if(Math.abs(rawDelta)>8)_planDragHappened=true;
+    const atStart=cur===0&&rawDelta>0,atEnd=cur===N-1&&rawDelta<0;
+    let visual;
+    if(atStart||atEnd){visual=snapX(cur)+rubberClamp(rawDelta,true);}
+    else{visual=snapX(cur)+rawDelta*0.6;}
+    const minX=snapX(N-1)-cardW()*0.3,maxX=snapX(0)+cardW()*0.3;
+    visual=Math.max(minX,Math.min(maxX,visual));
+    grid.style.transform=`translateX(${visual}px)`;
+    currentX=visual;
+  },{passive:false});
+
+  grid.addEventListener('touchend',()=>{
+    if(!active)return;
+    active=false;
+    grid.classList.remove('dragging');
+    if(_touchDir==='h'){
+      const atStart=cur===0&&rawDelta>0,atEnd=cur===N-1&&rawDelta<0;
+      if(!atStart&&!atEnd&&rawDelta<-THRESHOLD)goTo(cur+1);
+      else if(!atStart&&!atEnd&&rawDelta>THRESHOLD)goTo(cur-1);
+      else goTo(cur);
+    }
+    _touchDir=null;
+    _planDetailLocked=true;
+    setTimeout(()=>{_planDetailLocked=false;},700);
+  },{passive:true});
   window.addEventListener('resize',()=>goToInstant(cur));
   const homeEl=document.getElementById('page-home');
   if(homeEl)new MutationObserver(()=>{if(homeEl.classList.contains('active')){_scrollFixed=false;requestAnimationFrame(()=>{goToInstant(cur);setTimeout(()=>goToInstant(cur),100);setTimeout(()=>goToInstant(cur),300);});}}).observe(homeEl,{attributes:true,attributeFilter:['class']});
