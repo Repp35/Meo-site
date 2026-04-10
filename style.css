@@ -78,9 +78,8 @@ nav.hidden{opacity:0;visibility:hidden;pointer-events:none}
 .nav-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 .nav-dropdown{position:fixed;top:60px;left:0;right:0;z-index:250;background:rgba(8,8,16,.88);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;max-height:0;transition:max-height .2s cubic-bezier(.4,0,.2,1),opacity .15s ease,visibility .15s;opacity:0;visibility:hidden;pointer-events:none}
 .nav-dropdown.open{max-height:680px;opacity:1;visibility:visible;pointer-events:all}
-.menu-blur-overlay{display:none}
-.menu-blur-overlay.on{display:none}
-.nav-dropdown.open::before{content:'';position:fixed;inset:0;top:0;z-index:-1;background:rgba(8,8,16,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);pointer-events:none}
+.menu-blur-overlay{display:none;position:fixed;inset:0;z-index:249;background:rgba(8,8,16,.35)}
+.menu-blur-overlay.on{display:block}
 .nav-dropdown-inner{padding:14px 16px 20px}
 .nav-drop-items{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
 .nav-drop-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:.5rem;cursor:pointer;border:1px solid transparent;transition:all .15s}
