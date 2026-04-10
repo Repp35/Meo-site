@@ -860,5 +860,18 @@
 <script src="js/ui.js"></script>
 <script src="js/features.js"></script>
 <script src="js/search.js"></script>
+
+<!-- ── AVATAR CROPPER ── -->
+<div class="ghost-crop-ov" id="ghost-cropOv">
+  <div class="ghost-crop-title">Ajustar foto</div>
+  <div class="ghost-crop-stage" id="ghost-cropStage">
+    <img class="ghost-crop-img" id="ghost-cropImg" draggable="false">
+    <div class="ghost-crop-circle"></div>
+  </div>
+  <div class="ghost-crop-btns">
+    <button class="ghost-crop-cancel" onclick="closeCropper()">Cancelar</button>
+    <button class="ghost-crop-confirm" onclick="confirmCrop()">Confirmar</button>
+  </div>
+</div>
 </body>
 </html>
