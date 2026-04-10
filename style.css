@@ -77,8 +77,8 @@ nav.hidden{opacity:0;visibility:hidden;pointer-events:none}
 .nav-menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
 .nav-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 /* ── MENU DRAWER (novo) ── */
-.menu-blur-overlay{display:none;position:fixed;inset:0;z-index:249;background:rgba(0,0,0,.55)}
-.menu-blur-overlay.on{display:block}
+.menu-blur-overlay{display:none}
+.menu-blur-overlay.on{display:none}
 .nav-dropdown{position:fixed;top:0;right:0;bottom:0;width:78vw;max-width:300px;z-index:250;background:#0f0508;border-left:1px solid rgba(220,38,38,.25);transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);visibility:hidden;pointer-events:none;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 .nav-dropdown.open{transform:translateX(0);visibility:visible;pointer-events:auto}
 .nav-dropdown-inner{padding:20px 16px 32px;display:flex;flex-direction:column;min-height:100%}
