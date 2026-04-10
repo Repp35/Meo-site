@@ -411,7 +411,7 @@ function changeCreditsQty(delta) {
 }
 
 function updatePresetsUI() {
-  document.getElementById('creditsQtyNum').textContent = _creditsQty;
+  document.getElementById('creditsQtyNum').value = _creditsQty;
   document.querySelectorAll('.credits-preset').forEach((btn, i) => {
     const vals = [1, 5, 10, 20];
     btn.classList.toggle('active', vals[i] === _creditsQty);
@@ -426,7 +426,7 @@ function renderCreditsSummary() {
   const disc      = getDiscount(brlBase);
   const brlFinal  = brlBase * (1 - disc.pct / 100);
 
-  document.getElementById('creditsQtyNum').textContent = _creditsQty;
+  document.getElementById('creditsQtyNum').value = _creditsQty;
 
   const modName = MODS[m]?.name || m;
 
@@ -828,20 +828,13 @@ async function submitLogin(btn) {
   if (!identifier.includes('@')) {
     const byName = await sbGet('profiles', `nome=ilike.${encodeURIComponent(identifier)}&limit=1`);
     const profile = byName?.[0] || null;
-    if (!profile) {
+    if (!profile || !profile.email) {
       btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
       [identEl, senhaEl].forEach(i => i.style.borderColor = 'rgba(248,113,113,.6)');
       showModalErr(overlay, 'Usuário ou senha incorretos.');
       return;
     }
-    // pega o email do auth.users pelo id do profile
-    const { data: { user: authUser } } = await _sb.auth.admin?.getUserById?.(profile.id) || { data: {} };
-    if (!authUser?.email) {
-      btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
-      showModalErr(overlay, 'Usuário ou senha incorretos.');
-      return;
-    }
-    loginEmail = authUser.email;
+    loginEmail = profile.email;
   }
 
   const { data: signInData, error: signInErr } = await _sb.auth.signInWithPassword({
@@ -1412,11 +1405,7 @@ function updateNavUser() {
   updatePlanPrices();
 }
 
-function goHistory() {
-  pushNav('history');
-  renderHistory();
-  showPage('history');
-}
+// goHistory definida em ui.js
 
 // ── HELPER CACHEADO ──
 function getTotalUsed() {
