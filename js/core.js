@@ -909,6 +909,7 @@ async function _loadSession() {
     queryCounters = await getDailyCounters(email, profile.plano);
 
     currentUser = {
+      id:            uid,
       name:          profile.nome,
       email:         email,
       plan:          profile.plano,
