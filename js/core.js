@@ -405,7 +405,7 @@ function goCredits(mod) {
 }
 
 function changeCreditsQty(delta) {
-  _creditsQty = Math.max(0.5, Math.min(100, Math.round((_creditsQty + delta * 0.5) * 2) / 2));
+  _creditsQty = Math.max(1, Math.min(100, _creditsQty + delta));
   renderCreditsSummary();
   updatePresetsUI();
 }
@@ -552,7 +552,7 @@ function toggleFaq(el) {
     if (a) a.style.maxHeight = a.scrollHeight + 'px';
     // recalcula painel pai pra acomodar item aberto
     const panel = el.closest('.faq-panel');
-    if (panel) panel.style.maxHeight = panel.scrollHeight + a.scrollHeight + 'px';
+    if (panel) panel.style.maxHeight = panel.scrollHeight + 'px';
   }
 }
 
@@ -614,7 +614,7 @@ function showPage(id, pushHistory = true) {
   el.classList.add('active');
   el.style.animation = 'pageIn .22s ease both';
   window.scrollTo(0, 0);
-  const _restorablePages = ['settings','wallet','history','chat','plans','store','modules'];
+  const _restorablePages = ['settings','wallet','history','chat','store','modules'];
   try {
     if(_restorablePages.includes(id)) {
       sessionStorage.setItem('ghost_last_page', id);
@@ -762,22 +762,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ── registrar ──
 async function submitRegister(btn) {
-  const overlay = document.getElementById('modal-register');
-  const inputs  = overlay.querySelectorAll('.modal-input');
-  const nomeEl  = inputs[0], emailEl = inputs[1], senhaEl = inputs[2];
-  [nomeEl, emailEl, senhaEl].forEach(i => i.style.borderColor = '');
+  const overlay    = document.getElementById('modal-register');
+  const nomeEl     = overlay.querySelector('input[autocomplete="name"]');
+  const emailEl    = overlay.querySelector('#reg-identifier');
+  const usernameEl = overlay.querySelector('#reg-username');
+  const senhaEl    = overlay.querySelector('#reg-pw');
+  [nomeEl, emailEl, usernameEl, senhaEl].forEach(i => i && (i.style.borderColor = ''));
 
   let ok = true;
-  const shakeInp = i => { i.style.borderColor='rgba(248,113,113,.6)'; i.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:180}); ok=false; };
+  const shakeInp = i => { if(!i)return; i.style.borderColor='rgba(248,113,113,.6)'; i.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:180}); ok=false; };
 
-  const nome  = nomeEl.value.trim();
-  const email = emailEl.value.trim().toLowerCase();
-  const senha = senhaEl.value;
+  const nome     = nomeEl?.value.trim() || '';
+  const email    = emailEl?.value.trim().toLowerCase() || '';
+  const username = usernameEl?.value.trim() || '';
+  const senha    = senhaEl?.value || '';
 
-  if (!nome)                                         shakeInp(nomeEl);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))   shakeInp(emailEl);
-  if (senha.length < 5)                             shakeInp(senhaEl);
+  if (!nome)                                          shakeInp(nomeEl);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))    shakeInp(emailEl);
+  if (!username || username.length < 3)               shakeInp(usernameEl);
+  if (senha.length < 5)                              shakeInp(senhaEl);
   if (!ok) return;
+
+  // username vira o "nome" exibido — combina nome + username
+  const displayName = username;
 
   const orig = btn.textContent;
   btn.textContent = 'Criando conta...'; btn.style.opacity = '.7'; btn.disabled = true;
@@ -785,7 +792,7 @@ async function submitRegister(btn) {
   const { error: signUpErr } = await _sb.auth.signUp({
     email,
     password: senha,
-    options: { data: { nome } }
+    options: { data: { nome: displayName } }
   });
 
   if (signUpErr) {
@@ -802,7 +809,7 @@ async function submitRegister(btn) {
   setTimeout(async () => {
     closeModal('modal-register');
     btn.textContent = orig; btn.style.opacity = ''; btn.style.background = ''; btn.disabled = false;
-    [nomeEl, emailEl, senhaEl].forEach(i => { i.value = ''; i.style.borderColor = ''; });
+    [nomeEl, emailEl, usernameEl, senhaEl].forEach(i => { if(i){ i.value = ''; i.style.borderColor = ''; } });
     clearModalErr(overlay);
     await _loadSession();
     setTimeout(() => showWelcomeCouponModal(), 600);
@@ -1614,7 +1621,6 @@ function applyHeroContent() {
 // ── CUPONS ──
 const PLAN_COUPONS = {
   'BEMVINDO': { type:'welcome_discount' },
-  'DEMO':    { plan:'basico',  name:'Reppzudo', email:'renanmonteiro123356@gmail.com', days:0 },
   'BASICO':  { plan:'basico',  name:null, email:null, days:0 },
   'STARTER': { plan:'starter', name:null, email:null, days:7 },
   'PRO':     { plan:'pro',     name:null, email:null, days:15 },
