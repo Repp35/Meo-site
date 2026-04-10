@@ -306,11 +306,11 @@ function initCropDrag(){
 function confirmCrop(){
   const img=document.getElementById('ghost-cropImg');
   const canvas=document.createElement('canvas');canvas.width=canvas.height=260;
-  const ctx=canvas.getContext('2d');ctx.beginPath();ctx.arc(130,130,130,0,Math.PI*2);ctx.clip();
-  // converte coordenadas da stage para coordenadas naturais da imagem
-  const sx=-_cropX/_cropScale, sy=-_cropY/_cropScale;
-  const sw=_CROP_STAGE/_cropScale, sh=_CROP_STAGE/_cropScale;
-  ctx.drawImage(img,sx,sy,sw,sh,0,0,260,260);
+  const ctx=canvas.getContext('2d');
+  ctx.beginPath();ctx.arc(130,130,130,0,Math.PI*2);ctx.clip();
+  ctx.translate(_cropX,_cropY);
+  ctx.scale(_cropScale,_cropScale);
+  ctx.drawImage(img,0,0);
   const dataUrl=canvas.toDataURL('image/jpeg',.92);
   closeCropper();
   if(_cropCallback)_cropCallback(dataUrl);
