@@ -10,7 +10,6 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;border:0}
 html{background:var(--bg);color:var(--fg);font-family:var(--font-body);line-height:1.5;overflow-x:hidden;-webkit-text-size-adjust:100%;font-size:clamp(13px,3.5vw,16px);touch-action:pan-x pan-y}
 body{margin:0;overflow-x:hidden;-webkit-font-smoothing:antialiased;min-height:100vh;min-height:-webkit-fill-available;background:var(--bg);touch-action:pan-x pan-y}
-body.scroll-dimmed{touch-action:pan-y;scroll-snap-type:none;overflow-y:scroll;-webkit-overflow-scrolling:auto}
 button{font-family:inherit;cursor:pointer;background:none;border:none;color:inherit}
 input{font-family:inherit;color:inherit;caret-color:var(--p)}
 a{color:inherit;text-decoration:none}
@@ -79,7 +78,7 @@ nav.hidden{opacity:0;visibility:hidden;pointer-events:none}
 .nav-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 .nav-dropdown{position:fixed;top:60px;left:0;right:0;z-index:250;background:rgba(8,8,16,.88);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;max-height:0;transition:max-height .2s cubic-bezier(.4,0,.2,1),opacity .15s ease,visibility .15s;opacity:0;visibility:hidden;pointer-events:none}
 .nav-dropdown.open{max-height:680px;opacity:1;visibility:visible;pointer-events:all}
-.menu-blur-overlay{position:fixed;inset:0;top:0;z-index:249;background:rgba(4,4,10,.6);opacity:0;pointer-events:none;transition:opacity .15s ease;will-change:opacity;transform:translateZ(0)}
+.menu-blur-overlay{position:fixed;inset:0;top:0;z-index:249;background:rgba(8,8,16,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .15s ease;will-change:opacity;transform:translateZ(0)}
 .menu-blur-overlay.on{opacity:1;pointer-events:all}
 .nav-dropdown-inner{padding:14px 16px 20px}
 .nav-drop-items{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
@@ -346,7 +345,7 @@ input::placeholder{color:rgba(148,163,184,.25)}
 .ld-step.on .step-dot{box-shadow:0 0 4px currentColor;animation:pulse 1.4s ease infinite}
 
 /* ── MODALS ── */
-.modal-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.3);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:20px;will-change:opacity;transform:translateZ(0)}
+.modal-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(8,8,16,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:20px;will-change:opacity;transform:translateZ(0)}
 .modal-overlay.open{display:flex;animation:fadeIn .18s ease}
 .modal-overlay.closing{animation:fadeOut .2s ease forwards}
 .modal.closing{animation:modalOut .2s ease forwards}
