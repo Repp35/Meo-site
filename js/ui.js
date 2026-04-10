@@ -790,6 +790,8 @@ document.body.style.overflow='';
 
   grid.addEventListener('touchmove',e=>{
     if(!active||e.touches.length>1)return;
+    const rect=grid.getBoundingClientRect();
+    if(rect.bottom<0||rect.top>window.innerHeight){active=false;return;}
     const dx=e.touches[0].clientX-startX;
     const dy=e.touches[0].clientY-startY;
     // decide direção no primeiro movimento significativo
