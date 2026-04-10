@@ -1235,6 +1235,11 @@ function toggleMenu() {
     dd.classList.add('open');
     overlay?.classList.add('on');
     closeAllPlanDetails();
+    // impede touchmove de vazar pro body
+    if (!dd._touchLocked) {
+      dd._touchLocked = true;
+      dd.addEventListener('touchmove', e => e.stopPropagation(), {passive:true});
+    }
 
     // DEBUG VISUAL
     document.getElementById('__dbg')?.remove();
