@@ -3,7 +3,7 @@
 // ── ESTADO DO USUÁRIO ──
 let currentUser = null; // { name, email, plan }
 let queryCounters = {}; // { cpf: 3, nome: 1, ... }
-let activeCoupon = null;
+let activeCoupons = new Set();
 
 // ── AUTH & CONTA — Supabase ──
 
@@ -81,16 +81,27 @@ function histSetEnabled(v) {
   LS.set(HIST_ENABLED_KEY(currentUser.email), v);
 }
 function histAdd(entry) {
-  if (!histEnabled()) return;
-  const key = HIST_KEY(currentUser.email);
-  const list = LS.get(key) || [];
-  list.unshift({ ...entry, ts: Date.now() });
-  if (list.length > 200) list.length = 200;
-  LS.set(key, list);
+  if (!histEnabled() || !currentUser || currentUser.anon) return;
+  sbPost('historico', {
+    user_id: currentUser.id,
+    type:    entry.type  || 'consulta',
+    name:    entry.name  || '',
+    free:    entry.free  ?? false,
+    quota:   entry.quota ?? false,
+    value:   entry.value ? Number(entry.value) : null,
+    ts:      Date.now(),
+  }).catch(() => {});
 }
-function histClear() {
+async function histLoad() {
+  if (!currentUser || currentUser.anon) return [];
+  try {
+    const rows = await sbGet('historico', `user_id=eq.${currentUser.id}&order=ts.desc&limit=200`);
+    return rows || [];
+  } catch { return []; }
+}
+async function histClear() {
   if (!currentUser || currentUser.anon) return;
-  LS.set(HIST_KEY(currentUser.email), []);
+  await sbDelete('historico', `user_id=eq.${currentUser.id}`);
 }
 
 
@@ -98,33 +109,51 @@ function histClear() {
 // ── contadores diários — 100% Supabase ──
 function todayStr() { return new Date().toISOString().slice(0,10); }
 
-async function getDailyCounters(email, plan) {
+async function getDailyCounters(email, plan, uid) {
   try {
-    const row = await sbGetOne('daily_counters',
-      `user_key=eq.${encodeURIComponent(email)}&plan=eq.${plan || 'basico'}&date=eq.${todayStr()}`);
+    const id = uid || currentUser?.id;
+    if (!id) return {};
+    const row = await sbGetOne('daily_counters', `user_id=eq.${id}&date=eq.${todayStr()}`);
     return row?.counters || {};
   } catch { return {}; }
 }
 
 async function saveDailyCounters(email, counters, plan) {
   try {
+    if (!currentUser?.id) return;
     await sbUpsert('daily_counters',
-      { user_key: email, plan: plan || currentUser?.plan || 'basico', date: todayStr(), counters },
-      'user_key,plan,date');
+      { user_id: currentUser.id, user_key: email, plan: plan || currentUser?.plan || 'basico', date: todayStr(), counters },
+      'user_id,date');
   } catch {}
 }
 
 // ── SISTEMA ANÔNIMO ──
-function getOrCreateAnonId() {
-  let id = LS.get('ghost_anon_id');
-  if (!id) { id = 'anon_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); LS.set('ghost_anon_id', id); }
-  return id;
+let _fpPromise = null;
+function _loadFingerprint() {
+  if (!_fpPromise) _fpPromise = FingerprintJS.load().then(fp => fp.get()).then(r => 'anon_fp_' + r.visitorId);
+  return _fpPromise;
 }
-function initAnon() {
+
+async function initAnon() {
   queryCounters = {};
-  currentUser = { name: 'Visitante', email: getOrCreateAnonId(), plan: 'basico', anon: true };
+  let anonId;
+  try {
+    anonId = await _loadFingerprint();
+  } catch {
+    // fallback pro localStorage se o FingerprintJS falhar
+    anonId = LS.get('ghost_anon_id');
+    if (!anonId) { anonId = 'anon_fp_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); LS.set('ghost_anon_id', anonId); }
+  }
+  currentUser = { name: 'Visitante', email: anonId, plan: 'visitante', anon: true };
+  // carrega contadores do Supabase
+  try { queryCounters = await getDailyCounters(anonId, 'visitante'); } catch { queryCounters = {}; }
 }
-function _persistCountersAnon() {}
+
+function _persistCountersAnon() {
+  if (currentUser?.anon && currentUser?.email) {
+    saveDailyCounters(currentUser.email, queryCounters, 'visitante');
+  }
+}
 
 // ── BALÃO DE CONSULTAS ──
 function updateBalloon() {
@@ -138,7 +167,7 @@ function updateBalloon() {
   const total  = limits.total;
   const usedN  = getTotalUsed();
 
-  if (total === 999) {
+  if (total === -1) {
     bar.style.width = '100%'; bar.className = 'qb-bar';
     if (numsEl) numsEl.innerHTML = '<strong>∞</strong> restantes';
     return;
@@ -156,17 +185,16 @@ function updateBalloon() {
 }
 
 function toggleQbTooltip(e) {
+  e.stopPropagation();
   const tip  = document.getElementById('qbTooltip');
-  const btn  = document.getElementById('qbInfoBtn');
   if (tip.classList.contains('on')) { tip.classList.remove('on'); return; }
 
   const plan   = currentUser?.plan || 'basico';
   const limits = PLAN_LIMITS[plan];
   const total  = limits.total;
   const usedN  = Object.values(queryCounters).reduce((a,b)=>a+b,0);
-  const leftN  = total === 999 ? '∞' : Math.max(0, total - usedN);
+  const leftN  = total === -1 ? '∞' : Math.max(0, total - usedN);
 
-  
   const now  = new Date();
   const meia = new Date(now); meia.setHours(24,0,0,0);
   const diff = meia - now;
@@ -174,19 +202,12 @@ function toggleQbTooltip(e) {
   const mm   = Math.floor((diff % 3600000) / 60000);
   const resetStr = hh > 0 ? `${hh}h ${mm}min` : `${mm}min`;
 
-  tip.innerHTML = `<strong>${leftN} consultas restantes</strong><br>Plano <strong>${limits.label}</strong> · ${total === 999 ? 'Ilimitado' : total + ' por dia'}<br><span style="color:var(--p3)">↺ Reseta em ${resetStr}</span>`;
-
-  
-  const r = btn.getBoundingClientRect();
-  tip.style.top  = (r.bottom + 8) + 'px';
-  tip.style.left = Math.min(r.left, window.innerWidth - 240) + 'px';
+  tip.innerHTML = `<strong>${leftN} consultas restantes</strong><br>Plano <strong>${limits.label}</strong> · ${total === -1 ? 'Ilimitado' : total + ' por dia'}<br><span style="color:var(--p3)">↺ Reseta em ${resetStr}</span>`;
   tip.classList.add('on');
 
-  
-  setTimeout(() => {
-    const close = ev => { tip.classList.remove('on'); document.removeEventListener('click', close); };
-    document.addEventListener('click', close);
-  }, 10);
+  // Fecha ao clicar em qualquer lugar
+  const close = () => { tip.classList.remove('on'); document.removeEventListener('click', close); };
+  setTimeout(() => document.addEventListener('click', close), 10);
 }
 
 // ── MODAL DE UPGRADE/UNLOCK ──
@@ -365,7 +386,12 @@ let _creditsTargetMod = null;
 let _creditsQty = 1;
 
 function goCredits(mod) {
-  _creditsTargetMod = mod || 'cpf'; // padrão: CPF
+  if (!currentUser || currentUser.anon) {
+    showToast('Crie uma conta para comprar créditos.', 'error');
+    setTimeout(() => openModal('modal-register'), 400);
+    return;
+  }
+  _creditsTargetMod = mod || 'cpf';
   const m       = _creditsTargetMod;
   const modName = MODS[m]?.name || m;
   const cost    = MOD_CREDITS[m] || 0.7;
@@ -550,9 +576,14 @@ function toggleFaq(el) {
     // altura dinâmica: evita corte se o texto crescer
     const a = el.querySelector('.faq-a');
     if (a) a.style.maxHeight = a.scrollHeight + 'px';
-    // recalcula painel pai pra acomodar item aberto
+    // recalcula painel pai após a animação do item terminar
     const panel = el.closest('.faq-panel');
-    if (panel) panel.style.maxHeight = panel.scrollHeight + 'px';
+    if (panel) {
+      panel.style.maxHeight = panel.scrollHeight + 'px';
+      setTimeout(() => {
+        if (panel) panel.style.maxHeight = panel.scrollHeight + 'px';
+      }, 320);
+    }
   }
 }
 
@@ -608,11 +639,11 @@ function setFamType(type, btn) {
 }
 
 // ── NAVIGATION ──
-function showPage(id, pushHistory = true) {
+function showPage(id, pushHistory = true, isBack = false) {
   document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.animation=''; });
   const el = document.getElementById('page-'+id);
   el.classList.add('active');
-  el.style.animation = 'pageIn .22s ease both';
+  el.style.animation = isBack ? 'pageBack .22s ease both' : 'pageIn .22s ease both';
   window.scrollTo(0, 0);
   const _restorablePages = ['settings','wallet','history','chat','store','modules'];
   try {
@@ -744,8 +775,17 @@ function downloadResults() {
 }
 
 function goBack() {
-  if(navHist.length>1){ navHist.pop(); showPage(navHist[navHist.length-1]); }
-  else goHome();
+  // se estava na tela de liberar e não liberou ninguém, devolve a consulta
+  if (window._liberarModeActive && !window._liberarAnyReleased && window._liberarRefundMod) {
+    const mod = window._liberarRefundMod;
+    if (queryCounters[mod] > 0) queryCounters[mod]--;
+    if (currentUser?.email) saveDailyCounters(currentUser.email, queryCounters, currentUser.plan);
+    updateBalloon(); updateModulesBanner();
+  }
+  window._liberarModeActive = false;
+  window._liberarAnyReleased = false;
+  window._liberarRefundMod = null;
+  history.back();
 }
 function pushNav(page) { if(navHist[navHist.length-1]!==page) navHist.push(page); }
 // ── DOM bindings (adiados para garantir que os elementos existem) ──
@@ -755,7 +795,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const _btnBk    = document.getElementById('btnBk');
   if (_modsBack) _modsBack.onclick = goBack;
   if (_qBack)    _qBack.onclick    = goBack;
-  if (_btnBk)    _btnBk.onclick    = () => { showPage('query'); };
+  if (_btnBk)    _btnBk.onclick    = goBack;
   document.addEventListener('keydown', e=>{ if(e.key==='Enter'&&document.getElementById('page-query')?.classList.contains('active')) doSearch(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAllModals(); });
 });
@@ -780,14 +820,52 @@ async function submitRegister(btn) {
   if (!nome)                                          shakeInp(nomeEl);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))    shakeInp(emailEl);
   if (!username || username.length < 3)               shakeInp(usernameEl);
-  if (senha.length < 5)                              shakeInp(senhaEl);
+  if (senha.length < 6)                              shakeInp(senhaEl);
   if (!ok) return;
 
   // username vira o "nome" exibido — combina nome + username
   const displayName = username;
 
   const orig = btn.textContent;
-  btn.textContent = 'Criando conta...'; btn.style.opacity = '.7'; btn.disabled = true;
+  btn.textContent = 'Verificando...'; btn.style.opacity = '.7'; btn.disabled = true;
+
+  // verifica IP suspeito (VPN, Tor, datacenter)
+  try {
+    const ipRes = await fetch(`${SUPABASE_URL}/functions/v1/check-suspicious`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+      body: JSON.stringify({})
+    });
+    const ipData = await ipRes.json();
+    if (ipData.suspicious) {
+      showModalErr(overlay, 'Cadastro não permitido com VPN, proxy ou Tor. Desative e tente novamente.');
+      btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
+      return;
+    }
+  } catch {
+    // se a verificação falhar por erro de rede, deixa passar
+  }
+
+  // verifica se o domínio do email realmente aceita emails
+  try {
+    const verifyRes = await fetch(`${SUPABASE_URL}/functions/v1/verify-email-real`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+      body: JSON.stringify({ email })
+    });
+    const verifyData = await verifyRes.json();
+    if (!verifyData.valid) {
+      emailEl.style.borderColor = 'rgba(248,113,113,.6)';
+      emailEl.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:180});
+      showModalErr(overlay, verifyData.reason || 'E-mail inválido.');
+      btn.textContent = orig; btn.style.opacity = ''; btn.disabled = false;
+      return;
+    }
+  } catch {
+    // se a verificação falhar por erro de rede, deixa passar
+  }
+
+  btn.textContent = 'Criando conta...';
 
   const { error: signUpErr } = await _sb.auth.signUp({
     email,
@@ -898,7 +976,7 @@ function clearModalErr(overlay) {
 async function _loadSession() {
   try {
     const session = await getAuthSession();
-    if (!session) { initAnon(); updateNavUser(); return; }
+    if (!session) { await initAnon(); updateNavUser(); return; }
 
     const uid = session.user.id;
     const email = session.user.email;
@@ -907,7 +985,7 @@ async function _loadSession() {
 
     if (!profile) {
       await _sb.auth.signOut();
-      initAnon();
+      await initAnon();
       updateNavUser();
       return;
     }
@@ -919,7 +997,7 @@ async function _loadSession() {
       profile.plan_expires_at = null;
     }
 
-    queryCounters = await getDailyCounters(email, profile.plano);
+    queryCounters = await getDailyCounters(email, profile.plano, uid);
 
     currentUser = {
       id:            uid,
@@ -934,7 +1012,7 @@ async function _loadSession() {
     updateNavUser();
 
   } catch {
-    initAnon();
+    await initAnon();
     updateNavUser();
   }
 }
@@ -962,7 +1040,7 @@ function saveProfileChanges() {
   msgEl.className   = 'set-msg';
 
   if (!newNome) { msgEl.textContent = 'Nome não pode estar vazio.'; msgEl.className='set-msg err'; nomeEl?.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:200}); return; }
-  if (newSenha && newSenha.length < 5) { msgEl.textContent = 'Senha deve ter no mínimo 5 caracteres.'; msgEl.className='set-msg err'; senhaEl?.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:200}); return; }
+  if (newSenha && newSenha.length < 6) { msgEl.textContent = 'Senha deve ter no mínimo 6 caracteres.'; msgEl.className='set-msg err'; senhaEl?.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:200}); return; }
   if (newSenha && newSenha !== newConf) { msgEl.textContent = 'As senhas não coincidem.'; msgEl.className='set-msg err'; confEl?.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:200}); return; }
 
   if (newSenha) {
@@ -1027,7 +1105,10 @@ async function _doSaveProfile() {
 }
 
 // ── MODALS ──
-function openModal(id){ closeAllModals(); document.getElementById(id).classList.add('open');  window._overlayOpen = true; }
+function openModal(id){
+  if((id==='modal-login'||id==='modal-register')&&currentUser&&!currentUser.anon) return;
+  closeAllModals(); document.getElementById(id).classList.add('open'); window._overlayOpen = true;
+}
 function closeModal(id){
   const overlay = document.getElementById(id);
   const modal   = overlay?.querySelector('.modal');
@@ -1219,7 +1300,7 @@ window.addEventListener('popstate', e => {
     if (qInp) { qInp.placeholder = m.ph; }
     if (famSel) famSel.style.display = mod==='familiares'?'flex':'none';
   }
-  showPage(page, false);
+  showPage(page, false, true);
 });
 
 
@@ -1268,7 +1349,7 @@ async function _doLogout() {
   await _sb.auth.signOut();
   currentUser = null;
   queryCounters = {};
-  activeCoupon = null;
+  activeCoupons = new Set();
   const wcModal = document.getElementById('welcomeCouponModal');
   if (wcModal) wcModal.classList.remove('open');
   updateNavUser();
@@ -1423,7 +1504,7 @@ function getModLeft(mod) {
   if (lim === 0) return 0;
   const used      = queryCounters[mod] || 0;
   const modLeft   = Math.max(0, lim - used);
-  if (limits.total === 999) return modLeft;
+  if (limits.total === -1) return modLeft;
   const totalLeft = Math.max(0, limits.total - getTotalUsed());
   return Math.min(modLeft, totalLeft);
 }
@@ -1445,7 +1526,7 @@ function canQuery(mod) {
 
   const modUsed   = queryCounters[mod] || 0;
   const totalUsed = getTotalUsed();
-  const totalLeft = limits.total === 999 ? Infinity : Math.max(0, limits.total - totalUsed);
+  const totalLeft = limits.total === -1 ? Infinity : Math.max(0, limits.total - totalUsed);
   const modLeft   = Math.max(0, lim - modUsed);
   const left      = Math.min(modLeft, totalLeft);
 
@@ -1592,12 +1673,9 @@ function applyHeroContent() {
 // ── CUPONS ──
 const PLAN_COUPONS = {
   'BEMVINDO': { type:'welcome_discount' },
-  'BASICO':  { plan:'basico',  name:null, email:null, days:0 },
-  'STARTER': { plan:'starter', name:null, email:null, days:7 },
-  'PRO':     { plan:'pro',     name:null, email:null, days:15 },
-  'PREMIUM': { plan:'premium', name:null, email:null, days:30 },
   'GHOST':   { type:'ghost' },
   'DOUBLE':  { type:'double' },
+  'GHOST2':  { type:'ghost2' },
   'CREDITS': { type:'credits', amount: 50 },
   'C10':     { type:'credits', amount: Math.round(10  * (10/2.70)) },
   'C50':     { type:'credits', amount: Math.round(50  * (10/2.70)) },
@@ -1625,17 +1703,9 @@ function redeemCoupon() {
       return;
     }
     if (coupon.plan) {
-      const name  = coupon.name  || (currentUser?.name  || 'Usuário');
-      const email = coupon.email || (currentUser?.email || '');
-      loginUser(name, email, coupon.plan, coupon.days || 0);
-      const label = PLAN_LIMITS[coupon.plan].label;
-      const daysMsg = coupon.days ? ` · válido por ${coupon.days} dias` : '';
-      msg.className = 'coupon-msg success';
-      msg.textContent = `✓ Plano ${label} ativado${daysMsg}!`;
-      input.classList.add('applied');
-      input.value = '';
-      setTimeout(() => input.classList.remove('applied'), 700);
-      setTimeout(() => { msg.className = 'coupon-msg'; msg.textContent = ''; }, 4000);
+      msg.className = 'coupon-msg error';
+      msg.textContent = '✕ Cupom inválido ou expirado.';
+      return;
     } else if (coupon.type === 'credits') {
       const userEmail = currentUser?.email;
       if (!userEmail) {
@@ -1656,7 +1726,7 @@ function redeemCoupon() {
       const limits = PLAN_LIMITS[plan];
       const LEAVE  = 5;
       Object.entries(limits).forEach(([mod, lim]) => {
-        if (typeof lim === 'number' && lim > LEAVE && lim !== -1 && lim !== 999 && mod !== 'label' && mod !== 'total') {
+        if (typeof lim === 'number' && lim > LEAVE && lim !== -1 && lim !== -1 && mod !== 'label' && mod !== 'total') {
           queryCounters[mod] = lim - LEAVE; // gasta até sobrar 5
         }
       });
@@ -1690,12 +1760,11 @@ function redeemCoupon() {
       input.value = '';
       setTimeout(() => { msg.className = 'coupon-msg'; msg.textContent = ''; }, 3000);
     } else {
-      activeCoupon = coupon;
+      activeCoupons.add(coupon.type);
       msg.className = 'coupon-msg success';
-      msg.textContent = coupon.type === 'ghost'
-        ? '✓ Modo Ghost ativo — resultados mockados habilitados.'
-        : '✓ Modo Double ativo — resultado duplo nas consultas.';
+      msg.textContent = '✓ Modo Double ativo — resultados mockados + duplicados.';
       input.classList.add('applied');
+      input.value = '';
       setTimeout(() => input.classList.remove('applied'), 700);
       setTimeout(() => { msg.className = 'coupon-msg'; msg.textContent = ''; }, 4000);
     }
@@ -1718,11 +1787,11 @@ function initDiscountBanner() {
   function showBanner() {
     if (currentUser && !currentUser.anon) { stopDiscountBanner(); return; }
     banner.classList.add('visible');
-    _discBannerTimer = setTimeout(hideBanner, 4000);
+    _discBannerTimer = setTimeout(hideBanner, 7000);
   }
   function hideBanner() {
     banner.classList.remove('visible');
-    _discBannerTimer = setTimeout(showBanner, 5500);
+    _discBannerTimer = setTimeout(showBanner, 3000);
   }
 
   _discBannerTimer = setTimeout(showBanner, 1800);
