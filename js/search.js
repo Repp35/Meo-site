@@ -153,14 +153,18 @@ function getMock(mod, val) {
 }
 
 // ── STUB ──
-async function searchStub(val){
-  stepSet(1,'on');
-  await new Promise(r=>setTimeout(r,600));
-  stepSet(1,'done'); stepSet(2,'on');
-  await new Promise(r=>setTimeout(r,550));
-  stepSet(2,'done');
+// forceGhost: ignora verificação de cupom (já validado no _runSearch como fallback)
+// skipSteps:  não anima steps (API real já os animou antes de falhar)
+async function searchStub(val, forceGhost = false, skipSteps = false){
+  if (!skipSteps) {
+    stepSet(1,'on');
+    await new Promise(r=>setTimeout(r,600));
+    stepSet(1,'done'); stepSet(2,'on');
+    await new Promise(r=>setTimeout(r,550));
+    stepSet(2,'done');
+  }
 
-  const isGhost = activeCoupon?.type === 'ghost' || activeCoupon?.type === 'double';
+  const isGhost = forceGhost || activeCoupons.has('ghost') || activeCoupons.has('ghost2');
 
   // foto só funciona com ghost
   if (curMod === 'foto') {
@@ -172,11 +176,7 @@ async function searchStub(val){
     if (!isGhost) return null;
     const f1 = getMock('familiares', val);
     const f2 = getMock('familiares2', val);
-    const result = f1 && f2 ? [f1, f2] : f1 ? [f1] : null;
-    if (activeCoupon?.type === 'double' && result) {
-      return [...result, ...result.map(r => ({...r, cpf: r.cpf ? '***.***.***-**' : undefined}))];
-    }
-    return result;
+    return f1 && f2 ? [f1, f2] : f1 ? [f1] : null;
   }
 
   // cep tem API real — se chegou aqui no stub é porque a API falhou
@@ -186,13 +186,7 @@ async function searchStub(val){
   if (!isGhost) return null;
 
   const mock = getMock(curMod, val);
-  if (!mock) return null;
-  if (activeCoupon?.type === 'double' && !NO_DOUBLE.has(curMod)) {
-    const mock2 = getMock(curMod, val);
-    if (mock2?.cpf !== undefined) mock2.cpf = '***.***.***-**';
-    return [mock, mock2];
-  }
-  return [mock];
+  return mock ? [mock] : null;
 }
 
 // ── CPF ──
@@ -440,6 +434,33 @@ function _handlePermissionDenied(perm) {
     pushNav('results'); showPage('results'); return;
   }
 
+  // visitante esgotou a consulta diária — pede cadastro
+  if (currentUser?.anon && (perm.reason === 'mod_limit' || perm.reason === 'total_limit')) {
+    const el = document.getElementById('modalUnlockContent');
+    const resetMsg = (() => {
+      const now  = new Date();
+      const meia = new Date(now); meia.setHours(24,0,0,0);
+      const diff = meia - now;
+      const hh   = Math.floor(diff / 3600000);
+      const mm   = Math.floor((diff % 3600000) / 60000);
+      return hh > 0 ? `${hh}h ${mm}min` : `${mm}min`;
+    })();
+    el.innerHTML = `
+      <div style="margin-bottom:10px;color:var(--p)"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7.03 2 3 6.03 3 11v9l3-2 2 2 2-2 2 2 2-2 3 2v-9c0-4.97-4.03-9-9-9zm-3.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></div>
+      <h3 style="font-size:1rem;font-weight:700;margin-bottom:8px">Você usou sua consulta gratuita</h3>
+      <p style="font-size:.8rem;color:var(--muted);line-height:1.6;margin-bottom:6px">Crie uma conta grátis e ganhe <strong style="color:var(--fg)">7 consultas por dia</strong> — sem precisar pagar nada.</p>
+      <p style="font-size:.72rem;color:var(--muted);margin-bottom:20px">↺ Ou aguarde ${resetMsg} para uma nova consulta gratuita.</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="modal-submit" style="width:100%" onclick="document.getElementById('modalUnlock').classList.remove('open');openModal('modal-register')">
+          Criar conta grátis
+        </button>
+        <button onclick="document.getElementById('modalUnlock').classList.remove('open');openModal('modal-login')" style="width:100%;padding:11px;border-radius:var(--r);font-size:.85rem;font-weight:600;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted2)">Já tenho conta</button>
+        <button onclick="document.getElementById('modalUnlock').classList.remove('open')" style="font-size:.75rem;color:var(--muted);padding:6px" onmouseover="this.style.color='var(--fg)'" onmouseout="this.style.color='var(--muted)'">Voltar amanhã</button>
+      </div>`;
+    document.getElementById('modalUnlock').classList.add('open');
+    return;
+  }
+
   if (perm.reason === 'credits-only') {
     if (canUseCredits(mod)) { askUseCredits(); return; }
     showUnlockModal(mod, 'credits-only'); return;
@@ -487,9 +508,24 @@ async function doSearch(){
   if (!val) { shake(); return; }
   if (!validateInput(curMod, val)) { shake(); return; }
 
-  // cupom ghost/double bypassa todas as restrições
-  const isGhost = activeCoupon?.type === 'ghost' || activeCoupon?.type === 'double';
+  // cupom ghost/double/ghost2 bypassa todas as restrições
+  const isGhost = activeCoupons.has('ghost') || activeCoupons.has('double') || activeCoupons.has('ghost2');
   if (isGhost) { await _runSearch(); return; }
+
+  // módulos com seleção de pessoa: conta 1 consulta ao pesquisar,
+  // mas devolve se o usuário sair sem liberar ninguém
+  if (LIBERAR_MODS.has(curMod)) {
+    const perm = canQuery(curMod);
+    if (!perm.ok) { _handlePermissionDenied(perm); return; }
+    window._liberarModeActive = true;
+    window._liberarAnyReleased = false;
+    incrementCounter(curMod);
+    const val2 = document.getElementById('qInp').value.trim();
+    const cost2 = MOD_CREDITS[curMod] || 0;
+    histAdd({ type:'consulta', name:`${MODS[curMod]?.name || curMod} — ${val2}`, free: cost2 === 0, quota: cost2 > 0, value: null });
+    await _runSearch(false, true);
+    return;
+  }
 
   const perm = canQuery(curMod);
 
@@ -512,28 +548,61 @@ async function doSearch(){
   await _runSearch();
 }
 
-async function _runSearch(useCredits = false) {
+async function _runSearch(useCredits = false, skipCount = false) {
   const val = document.getElementById('qInp').value.trim();
   showLd(curMod);
   const t0 = Date.now();
   const MIN_MS = 900;
+
+  async function _doApiCall() {
+    if (curMod==='cpf'||curMod==='cpfpro') return await searchCPF(val);
+    else if(curMod==='cnpj')  return await searchCNPJ(val);
+    else if(curMod==='cep')   return await searchCEP(val);
+    else if(curMod==='ip')    return await searchIP(val);
+    else if(curMod==='whois') return await searchWHOIS(val);
+    else if(curMod==='pix')   return await searchPix(val);
+    else return await searchStub(val);
+  }
+
   try{
     let res;
-    const isGhost = activeCoupon?.type === 'ghost' || activeCoupon?.type === 'double';
-    if (!isGhost && (curMod==='cpf'||curMod==='cpfpro')) res=await searchCPF(val);
-    else if(!isGhost && curMod==='cnpj')  res=await searchCNPJ(val);
-    else if(!isGhost && curMod==='cep')   res=await searchCEP(val);
-    else if(!isGhost && curMod==='ip')    res=await searchIP(val);
-    else if(!isGhost && curMod==='whois') res=await searchWHOIS(val);
-    else if(!isGhost && curMod==='pix')   res=await searchPix(val);
-    else res=await searchStub(val);
+    const isGhost  = activeCoupons.has('ghost')  || activeCoupons.has('ghost2');
+    const isDouble = activeCoupons.has('double') || activeCoupons.has('ghost2');
+
+    // Sempre tenta a API real primeiro
+    res = await _doApiCall();
+
+    // Se falhou (cooldown/erro), aguarda 1.8s e tenta novamente
+    if ((!res || res.length === 0) && !isGhost) {
+      stepMsg(1, 'Aguardando API...');
+      await new Promise(r => setTimeout(r, 1800));
+      res = await _doApiCall();
+    }
+
+    // ghost: se a API não retornou nada, cai no mock como fallback
+    if ((!res || res.length === 0) && isGhost) {
+      res = await searchStub(val, true, true); // forceGhost=true, skipSteps=true
+    }
+
+    // double: duplica todos os resultados (cópia com CPF mascarado)
+    if (res && res.length > 0 && isDouble) {
+      const copies = res.map(item => {
+        const copy = {...item};
+        if (copy.cpf !== undefined) copy.cpf = '***.***.***-**';
+        return copy;
+      });
+      res = [...res, ...copies];
+    }
+
     const elapsed = Date.now() - t0;
     if (elapsed < MIN_MS) await new Promise(r => setTimeout(r, MIN_MS - elapsed));
     if (res && res.length > 0) {
-      if (useCredits) { spendCredits(curMod); playCreditsAnimation(); }
-      else incrementCounter(curMod);
-      const cost = MOD_CREDITS[curMod] || 0;
-      histAdd({ type:'consulta', name:`${MODS[curMod]?.name || curMod} — ${val}`, free: cost === 0 || !useCredits, value: useCredits ? creditsToReal(cost).toFixed(2) : null });
+      if (!skipCount) {
+        if (useCredits) { spendCredits(curMod); playCreditsAnimation(); }
+        else incrementCounter(curMod);
+        const cost = MOD_CREDITS[curMod] || 0;
+        histAdd({ type:'consulta', name:`${MODS[curMod]?.name || curMod} — ${val}`, free: cost === 0 && !useCredits, quota: cost > 0 && !useCredits, value: useCredits ? creditsToReal(cost).toFixed(2) : null });
+      }
     }
     stepSet(3,'done'); hideLd(); pushNav('results'); renderResults(res);
     updateResultsBanner(curMod);
@@ -716,6 +785,130 @@ const MOD_RESULT_LABEL = {
 };
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+// ── SISTEMA LIBERAR ──
+const LIBERAR_MODS = new Set(['nome','familiares','placa','pix','cnh','cns','renavam']);
+
+// ── HELPERS DE MÁSCARA ──
+function _maskCpf(cpf) {
+  if (!cpf || cpf === '—' || cpf === 'Indisponível') return '—';
+  const d = cpf.replace(/\D/g,'');
+  if (d.length < 11) return cpf;
+  return `${d.slice(0,3)}.★★★.★★★-${d.slice(9,11)}`;
+}
+function _getDia(nasc) {
+  if (!nasc || nasc === '—' || nasc === 'Indisponível') return '··/··/····';
+  const partes = nasc.split(/[-\/]/);
+  let dd;
+  if (partes[0].length === 4) dd = (partes[2] || '??').padStart(2,'0');
+  else dd = (partes[0] || '??').padStart(2,'0');
+  return `${dd}/★★/★★★★`;
+}
+function _maskPlaca(placa) {
+  if (!placa || placa === '—' || placa === 'Indisponível') return '—';
+  const p = placa.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  return p.length >= 4 ? `${p.slice(0,3)}-****` : placa;
+}
+
+function _fakeCpf(seed) {
+  // mostra só os 3 primeiros e os 2 últimos dígitos
+  const first = ['282','391','475','513','637'][seed % 5];
+  const last  = ['11','34','72','58','96'][seed % 5];
+  return `${first}.***.***-${last}`;
+}
+function _fakeNasc(seed) {
+  const days = ['05','12','17','23','30'];
+  const months = ['03','07','09','11'];
+  const d = days[seed % days.length];
+  return `${d}/**/****`;
+}
+
+function _renderPreviewCard(item, idx) {
+  const mod = curMod;
+  const isDouble = activeCoupons.has('double') || activeCoupons.has('ghost2');
+  const cpfProCost  = MOD_CREDITS['cpfpro'] || 0;
+  const cpfProPrice = cpfProCost > 0 ? fmtBrl(creditsToReal(cpfProCost)) : null;
+  const relacao = item._relacao
+    ? `<span class="rc-relacao-tag">${esc(item._relacao)}</span>` : '';
+
+  let previewFields = '';
+
+  if (['nome','familiares','pix'].includes(mod) || item._type === 'cep_morador') {
+    const nome   = item.nome || (isDouble ? 'Indisponível' : '—');
+    const cpf    = isDouble ? _fakeCpf(idx) : _maskCpf(item.cpf);
+    const dia    = isDouble ? _fakeNasc(idx) : _getDia(item.nascimento);
+    const cidade = isDouble ? 'Amapá — AP' : (item.cidade ? (item.uf ? `${item.cidade} — ${item.uf}` : item.cidade) : '—');
+    previewFields = `
+      <div class="rpf-field"><span class="rpf-lbl">Nome:</span><span class="rpf-val">${esc(nome)}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">CPF:</span><span class="rpf-val rpf-masked">${cpf}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">Nascimento:</span><span class="rpf-val rpf-masked">${dia}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">Cidade:</span><span class="rpf-val">${esc(cidade)}</span></div>`;
+
+  } else if (['placa','renavam'].includes(mod)) {
+    const nome  = item.nome || (isDouble ? 'Indisponível' : '—');
+    const placa = _maskPlaca(item.placa_nacional || item.placa_mercosul || item.placa || item.renavam);
+    const uf    = isDouble ? 'AP' : (item.uf || '—');
+    previewFields = `
+      <div class="rpf-field"><span class="rpf-lbl">Proprietário:</span><span class="rpf-val">${esc(nome)}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">Placa:</span><span class="rpf-val rpf-masked">${placa}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">UF:</span><span class="rpf-val">${esc(uf)}</span></div>`;
+
+  } else if (mod === 'cnh') {
+    const nome = item.nome || (isDouble ? 'Indisponível' : '—');
+    const dia  = isDouble ? _fakeNasc(idx) : _getDia(item.data_nascimento || item.nascimento);
+    const cat  = item.categoria || (isDouble ? 'B' : '—');
+    previewFields = `
+      <div class="rpf-field"><span class="rpf-lbl">Nome:</span><span class="rpf-val">${esc(nome)}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">Nascimento:</span><span class="rpf-val rpf-masked">${dia}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">Categoria:</span><span class="rpf-val">${esc(cat)}</span></div>`;
+
+  } else if (mod === 'cns') {
+    const nome = item.nome || (isDouble ? 'Indisponível' : '—');
+    const dia  = isDouble ? _fakeNasc(idx) : _getDia(item.nascimento);
+    previewFields = `
+      <div class="rpf-field"><span class="rpf-lbl">Nome:</span><span class="rpf-val">${esc(nome)}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">Nascimento:</span><span class="rpf-val rpf-masked">${dia}</span></div>`;
+
+  } else {
+    const nome = item.nome || (isDouble ? 'Indisponível' : `Resultado ${idx+1}`);
+    const cpf  = isDouble ? _fakeCpf(idx) : _maskCpf(item.cpf);
+    previewFields = `
+      <div class="rpf-field"><span class="rpf-lbl">Nome:</span><span class="rpf-val">${esc(nome)}</span></div>
+      <div class="rpf-field"><span class="rpf-lbl">CPF:</span><span class="rpf-val rpf-masked">${cpf}</span></div>`;
+  }
+
+  const upsellTxt = cpfProPrice
+    ? `Ou acesse os dados completos por <span class="rpf-upsell-link" onclick="goCredits('cpfpro')">${cpfProPrice}</span>`
+    : '';
+
+  return `
+    <div class="rc rc-preview" id="rc-preview-${idx}" style="animation-delay:${idx * .08}s">
+      ${relacao ? `<div class="rc-preview-header">${relacao}</div>` : ''}
+      <div class="rc-preview-fields">${previewFields}</div>
+      <div class="rc-liberar-footer">
+        ${upsellTxt ? `<p class="rpf-upsell-hint">${upsellTxt}</p>` : ''}
+        <button class="rc-liberar-btn" id="rc-liberar-btn-${idx}" onclick="liberarCard(${idx});spawnBubbles(this)">
+          Liberar informações
+        </button>
+      </div>
+    </div>`;
+}
+async function liberarCard(idx) {
+  const btn = document.getElementById(`rc-liberar-btn-${idx}`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin .7s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Abrindo...'; }
+
+  window._liberarAnyReleased = true;
+
+  const data = window._lastResultData?.data;
+  if (!data || !data[idx]) return;
+
+  // renderiza APENAS o item escolhido como resultado completo
+  // (exatamente igual ao CPF — sem a intermediadora)
+  const savedMod = curMod;
+  LIBERAR_MODS.delete(savedMod);
+  renderResults([data[idx]]);
+  LIBERAR_MODS.add(savedMod);
+}
+
 function renderResults(data){
   const con = document.getElementById('resCon');
   showPage('results');
@@ -734,6 +927,40 @@ function renderResults(data){
   // guarda dados pra download
   window._lastResultData = { mod: curMod, modName, data };
   let hasFoto = false;
+
+  // módulos com sistema de liberar por pessoa
+  if (LIBERAR_MODS.has(curMod)) {
+    const isSingleNome = (curMod === 'nome' || curMod === 'familiares') && count === 1;
+    const allReleased = data.every(item => item._released || item._type === 'cep_info');
+
+    // todos liberados ou resultado único → cai no fluxo normal abaixo
+    if (!isSingleNome && !allReleased) {
+      let html = modHeader;
+      html += `<div class="res-count">${count} RESULTADO${count > 1 ? 'S' : ''} ENCONTRADO${count > 1 ? 'S' : ''}</div>`;
+      data.forEach((item, i) => {
+        if (item._type === 'cep_info') {
+          const sections = MOD_SECTIONS['cep'];
+          html += `<div class="rc" style="animation-delay:${i*.07}s"><div class="rc-head"><div class="rc-card-label">Informações do CEP</div></div>${renderWithSections(item, sections)}</div>`;
+        } else if (item._released) {
+          // já liberado: renderiza completo inline
+          const labelFn = MOD_RESULT_LABEL[curMod];
+          const label = labelFn ? labelFn(i, item) : (count > 1 ? `Resultado ${i+1}` : 'Resultado');
+          const sectionKey = (item._type && MOD_SECTIONS[item._type]) ? item._type : curMod;
+          const sections = MOD_SECTIONS[sectionKey];
+          const bodyHtml = sections ? renderWithSections(item, sections) : `<div class="rc-fields">${Object.entries(item).map(([k,v])=>{ if(!v||k.startsWith('_'))return''; const lbl=FIELD_LABELS[k]||k.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); return `<div class="rf"><div class="rf-lbl">${lbl}</div><div class="rf-val">${esc(v)}</div></div>`; }).join('')}</div>`;
+          html += `<div class="rc" style="animation-delay:${i*.07}s"><div class="rc-head"><div class="rc-card-label">${label}</div><div class="rc-liberated-badge">✓ Liberado</div></div>${bodyHtml}</div>`;
+        } else {
+          html += _renderPreviewCard(item, i);
+        }
+      });
+      con.innerHTML = html;
+      window.liberarCard = liberarCard;
+      window._liberarModeActive = true;
+      window._liberarRefundMod = curMod;
+      return;
+    }
+    // allReleased ou single → cai no fluxo normal abaixo
+  }
 
   let html = modHeader;
   if(count > 1) html += `<div class="res-count">${count} RESULTADOS ENCONTRADOS</div>`;
@@ -793,28 +1020,28 @@ function renderErr(t, m){
 // ── SEÇÕES POR MÓDULO ──
 const MOD_SECTIONS = {
   cpf: {
-    'Identificação':['cpf','nome','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
+    'Identificação':['nome','cpf','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
     'Filiação':['nome_mae','nome_pai'],
     'Documentos':['cnh','titulo_eleitor'],
     'Endereço':['logradouro','numero','bairro','cidade','uf','cep','ibge'],
     'Situação':['situacao_cadastral'],
   },
   pix: {
-    'Identificação':['cpf','nome','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
+    'Identificação':['nome','cpf','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
     'Filiação':['nome_mae','nome_pai'],
     'Documentos':['cnh','titulo_eleitor'],
     'Endereço':['logradouro','numero','bairro','cidade','uf','cep','ibge'],
     'Situação':['situacao_cadastral'],
   },
   nome: {
-    'Identificação':['cpf','nome','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
+    'Identificação':['nome','cpf','nascimento','idade','sexo','estado_civil','nacionalidade','naturalidade','signo'],
     'Filiação':['nome_mae','nome_pai'],
     'Documentos':['cnh','titulo_eleitor'],
     'Endereço':['logradouro','numero','bairro','cidade','uf','cep','ibge'],
     'Situação':['situacao_cadastral'],
   },
   cpfpro: {
-    'Identificação':['cpf','nome','nascimento','idade','sexo','signo','estado_civil','empresario','cnpj','servidor_publico'],
+    'Identificação':['nome','cpf','nascimento','idade','sexo','signo','estado_civil','empresario','cnpj','servidor_publico'],
     'Biometria':['cor_pele','cor_olhos','cor_cabelo','altura','pis'],
     'Pessoal':['nacionalidade','naturalidade','aposentado','parto_gemelar','escolaridade'],
     'Filiação':['nome_mae','nome_pai','irmaos'],
@@ -891,19 +1118,31 @@ function renderWithSections(item, sections){
       rendered.add(k);
       const lbl = FIELD_LABELS[k] || k.replace(/_/g,' ').replace(/\b\w/g, ch => ch.toUpperCase());
       if(lbl === '') return ''; // campos ocultos como google_maps inline
-      const val = v ? (HTML_K.has(k) ? v : esc(v)) : '<span style="color:rgba(148,163,184,.45);font-style:italic;font-size:.75rem">Indisponível</span>';
+      const val = v ? (HTML_K.has(k) ? v : esc(v)) : '<span class="rf-na">—</span>';
       return `<div class="rf ${WIDE.has(k)?'wide':''}"><div class="rf-lbl">${lbl}</div><div class="rf-val">${val}</div></div>`;
     }).join('');
     if(rows.trim()) html += `<div class="rc-section-label">${title}</div><div class="rc-fields">${rows}</div>`;
   }
   const rest = Object.entries(item).filter(([k])=>!rendered.has(k) && !k.startsWith('_')).map(([k,v])=>{
     const lbl = FIELD_LABELS[k] || k.replace(/_/g,' ').replace(/\b\w/g, ch => ch.toUpperCase());
-    const val = v ? esc(v) : '<span style="color:rgba(148,163,184,.45);font-style:italic;font-size:.75rem">Indisponível</span>';
+    const val = v ? esc(v) : '<span class="rf-na">—</span>';
     return `<div class="rf ${WIDE.has(k)?'wide':''}"><div class="rf-lbl">${lbl}</div><div class="rf-val">${val}</div></div>`;
   }).join('');
   if(rest.trim()) html += `<div class="rc-fields" style="padding-top:8px">${rest}</div>`;
   return html;
 }
+
+  function spawnBubbles(btn) {
+    for (let i = 0; i < 7; i++) {
+      const b = document.createElement('span');
+      b.className = 'bubble';
+      const size = 8 + Math.random() * 14;
+      b.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*(btn.offsetWidth-size)}px;top:${Math.random()*(btn.offsetHeight-size)}px;animation-delay:${i*0.06}s`;
+      btn.appendChild(b);
+      setTimeout(() => b.remove(), 700);
+    }
+  }
+  window.spawnBubbles = spawnBubbles;
 
   // EXPOR GLOBALS (funções usadas pelo HTML e outros módulos)
   window.doSearch      = doSearch;
@@ -911,8 +1150,9 @@ function renderWithSections(item, sections){
   window.renderErr     = renderErr;
   window._runSearch    = _runSearch;
   window.renderResults = renderResults;
+  window.liberarCard   = liberarCard;
 
-  console.log("[ghost:search] módulo carregado ✓");
+
 } catch(e) {
   console.error("[ghost:search] ERRO AO CARREGAR:", e);
   // Fallback: mostra erro amigável ao tentar buscar
