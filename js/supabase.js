@@ -68,6 +68,16 @@ window.sbUpsert = async function(table, body, onConflict) {
   } catch { return null; }
 };
 
+window.sbDelete = async function(table, query) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+      method: 'DELETE',
+      headers: await getAuthHeaders()
+    });
+    return r.ok;
+  } catch { return false; }
+};
+
 // ── STORAGE — avatars ──
 window.sbDeleteAvatar = async function(path) {
   try {
