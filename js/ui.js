@@ -1,5 +1,18 @@
 // Contém: animações 3D, wallet, histórico, settings, chat
 
+// ── CONFIRM BOX ──
+function closeConfirm(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('closing');
+  setTimeout(() => { el.classList.remove('open', 'closing'); }, 200);
+}
+document.addEventListener('click', function(e) {
+  document.querySelectorAll('.confirm-overlay.open:not(.closing)').forEach(el => {
+    if (!e.target.closest('.confirm-box') && el.contains(e.target)) closeConfirm(el.id);
+  });
+});
+
 // ── MENU ──
 function toggleMenu() {
   const btn      = document.getElementById('menuBtn');
@@ -8,6 +21,12 @@ function toggleMenu() {
   const isOpen   = dd.classList.contains('open');
   if (isOpen) closeMenu();
   else {
+    [btn, storeBtn].forEach(b => {
+      if (!b) return;
+      b.style.animation = 'none';
+      b.offsetHeight; // reflow
+      b.style.animation = 'menuBtnFlash .5s ease forwards';
+    });
     btn?.classList.add('open'); storeBtn?.classList.add('open');
     dd.classList.add('open');
     document.querySelector('nav')?.classList.add('menu-open');
@@ -17,8 +36,10 @@ function toggleMenu() {
   }
 }
 function closeMenu() {
-  document.getElementById('menuBtn')?.classList.remove('open');
-  document.getElementById('storeMenuBtn')?.classList.remove('open');
+  const btn = document.getElementById('menuBtn');
+  const storeBtn = document.getElementById('storeMenuBtn');
+  if (btn) { btn.classList.remove('open'); btn.style.animation = 'none'; }
+  if (storeBtn) { storeBtn.classList.remove('open'); storeBtn.style.animation = 'none'; }
   document.getElementById('navDropdown')?.classList.remove('open');
   document.getElementById('menuBlurOverlay')?.classList.remove('on');
   document.querySelector('nav')?.classList.remove('menu-open');
@@ -105,7 +126,7 @@ function playUpgradeAnimation(oldPlan, newPlan, onDone) {
   }, 3200);
 }
 
-// ── ANIMAÇÃO DE DOWNGRADE ──
+// ── ANIMAÇÃO DE DOWNGRADE ── (GSAP)
 function playDowngradeAnimation(oldPlan, newPlan, onDone) {
   const overlay = document.getElementById('upgrade-overlay');
   const cardOld = document.getElementById('upgCardOld');
@@ -125,16 +146,42 @@ function playDowngradeAnimation(oldPlan, newPlan, onDone) {
   cardNew.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:160px;padding:18px 16px;border-radius:1rem;text-align:center;border:1px solid rgba(255,255,255,.1);background:#0d0d1e;opacity:0;`;
   label.innerHTML = '';
 
-  overlay.style.animation = 'upgradeOverlayIn .25s ease both';
-  overlay.style.opacity   = '1';
+  // Entrada do overlay
+  gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'power2.out' });
   overlay.classList.add('on');
 
-  setTimeout(() => { cardOld.style.transition='opacity .5s ease, transform .5s ease'; cardOld.style.opacity='0'; cardOld.style.transform='translate(-50%,-50%) scale(.85)'; }, 300);
-  setTimeout(() => { cardNew.style.opacity='1'; cardNew.style.transition='opacity .4s ease'; label.innerHTML=`<strong>${newC.label}</strong>Plano alterado`; label.style.animation='hFade .4s ease both'; }, 900);
-  setTimeout(() => {
-    overlay.style.animation = 'upgradeOverlayOut .3s ease forwards';
-    setTimeout(() => { overlay.style.opacity='0'; overlay.classList.remove('on'); cardOld.style.cssText=''; cardNew.style.cssText=''; cardOld.style.opacity=''; cardOld.style.transition=''; if(onDone)onDone(); }, 300);
-  }, 2200);
+  // Card antigo some com scale + fade
+  gsap.to(cardOld, {
+    opacity: 0, scale: 0.82, y: '-50%', x: '-50%',
+    duration: 0.5, ease: 'power2.inOut', delay: 0.3,
+    onStart: () => { cardOld.style.transformOrigin = 'center center'; }
+  });
+
+  // Card novo entra
+  gsap.fromTo(cardNew,
+    { opacity: 0, scale: 0.88, y: '-44%', x: '-50%' },
+    { opacity: 1, scale: 1, y: '-50%', x: '-50%', duration: 0.45, ease: 'power3.out', delay: 0.95 }
+  );
+
+  // Label entra
+  gsap.fromTo(label,
+    { opacity: 0, y: 10 },
+    {
+      opacity: 1, y: 0, duration: 0.35, ease: 'power2.out', delay: 1.1,
+      onStart: () => { label.innerHTML = `<strong>${newC.label}</strong>Plano alterado`; }
+    }
+  );
+
+  // Fecha overlay
+  gsap.to(overlay, {
+    opacity: 0, duration: 0.3, ease: 'power2.in', delay: 2.2,
+    onComplete: () => {
+      overlay.classList.remove('on');
+      cardOld.style.cssText = ''; cardNew.style.cssText = '';
+      gsap.set([cardOld, cardNew, label], { clearProps: 'all' });
+      if (onDone) onDone();
+    }
+  });
 }
 
 function _runTyAnimation() {
@@ -281,7 +328,7 @@ function renderWallet() {
   const avatarHtml=avatar?`<img src="${avatar}" alt="avatar">`:`<span>${currentUser.name[0].toUpperCase()}</span>`;
   const buyBtn=`<button class="wallet-buy-btn" onclick="goCredits(null)"><svg width="10" height="12" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:inline-block;vertical-align:middle"><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="#fff" stroke-width="3" stroke-linecap="square" fill="none"/></svg>${credits>0?'Comprar mais créditos':'Comprar créditos'}</button>`;
   const knowBtn=`<button onclick="goCreditsInfo(null,true)" style="margin-top:10px;font-size:.78rem;font-weight:600;color:rgba(255,255,255,.7);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);padding:8px 22px;border-radius:99px;transition:all .2s" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,.3)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.borderColor='rgba(255,255,255,.18)'">Conhecer créditos</button>`;
-  el.innerHTML=`<div class="wallet-profile"><div class="wallet-avatar" id="walletAvatar">${avatarHtml}</div><div class="wallet-name" id="walletName">${currentUser.name}</div><div class="wallet-plan" style="color:${pc.color}">${limits.label}</div><div class="wallet-balance"><div class="wallet-balance-label">Saldo disponível</div><div class="wallet-balance-val"${credits>0?'':' style="color:var(--muted);font-size:1.8rem"'}>${brl}</div>${credits>0?`<div class="wallet-balance-sub">${credits} crédito${credits!==1?'s':''}</div>`:''}</div>${buyBtn}${knowBtn}</div>`;
+  el.innerHTML=`<div class="wallet-profile"><div class="wallet-avatar" id="walletAvatar">${avatarHtml}</div><div class="wallet-name" id="walletName">${escStr(currentUser.name)}</div><div class="wallet-plan" style="color:${pc.color}">${limits.label}</div><div class="wallet-balance"><div class="wallet-balance-label">Saldo disponível</div><div class="wallet-balance-val"${credits>0?'':' style="color:var(--muted);font-size:1.8rem"'}>${brl}</div>${credits>0?`<div class="wallet-balance-sub">${credits} crédito${credits!==1?'s':''}</div>`:''}</div>${buyBtn}${knowBtn}</div>`;
   if(avatar)applyAvatarColors(el,avatar);
 }
 
@@ -386,6 +433,8 @@ function triggerAvatarUpload() {
       showToast('Foto atualizada!');
     };
     // GIF pula o cropper pra preservar a animação
+    
+    if(file.size > 7 * 1024 * 1024){ showToast('Arquivo muito grande. Máximo 7MB.','error'); return; }
     if(file.type==='image/gif'){
       const avatarEl=document.querySelector('.settings-avatar');
       if(avatarEl){avatarEl.classList.remove('avatar-swapping');void avatarEl.offsetWidth;avatarEl.classList.add('avatar-swapping');setTimeout(()=>avatarEl.classList.remove('avatar-swapping'),500);}
@@ -428,15 +477,34 @@ function removeAvatar() {
 
 // HISTÓRICO + SETTINGS
 function showToast(msg, type='success') {
-  const t=document.createElement('div');
-  t.style.cssText=`position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${type==='error'?'#c0392b':'var(--p)'};color:#fff;padding:10px 20px;border-radius:99px;font-size:.82rem;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4);pointer-events:none;opacity:1;transition:opacity .4s`;
-  t.textContent=msg;
+  document.querySelectorAll('._ghost-toast').forEach(t => {
+    gsap.killTweensOf(t);
+    t.remove();
+  });
+  const t = document.createElement('div');
+  t.className = '_ghost-toast';
+  const isError = type === 'error';
+  t.style.cssText = `position:fixed;bottom:28px;left:50%;background:${isError?'#c0392b':'var(--p)'};color:#fff;padding:11px 24px;border-radius:99px;font-size:.82rem;font-weight:700;z-index:9999;box-shadow:0 6px 28px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap;`;
+  t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),400);},3000);
+  gsap.fromTo(t,
+    { opacity: 0, y: 18, x: '-50%', scale: 0.86 },
+    { opacity: 1, y: 0, x: '-50%', scale: 1, duration: 0.38, ease: 'back.out(2)' }
+  );
+  gsap.to(t, {
+    opacity: 0, y: 10, scale: 0.92, duration: 0.32, ease: 'power2.in', delay: 2.8,
+    onComplete: () => t.remove()
+  });
 }
 
 function goHistory() { pushNav('history'); renderHistory(); showPage('history'); }
-function goSettings() { pushNav('settings'); renderSettings(); showPage('settings'); }
+async function goSettings() {
+  pushNav('settings'); renderSettings(); showPage('settings');
+  if (currentUser && !currentUser.anon) {
+    const fresh = await getDailyCounters(currentUser.email, currentUser.plan);
+    if (fresh) { queryCounters = fresh; renderSettings(); }
+  }
+}
 function goUpgradePage() { goPlansFromResults(); closeMenu(); }
 
 function updateMiniBalloon(mod) {
@@ -449,7 +517,7 @@ function updateMiniBalloon(mod) {
   el.style.display='inline-flex';
   el.className='q-mini-balloon'+(left===0?' danger':left<=3?' warn':'');
   if(left===0){
-    const modUsed=queryCounters[mod]||0,modLimit=limits[mod],totalUsed=Object.values(queryCounters).reduce((a,b)=>a+b,0),totalLeft=limits.total===999?Infinity:Math.max(0,limits.total-totalUsed);
+    const modUsed=queryCounters[mod]||0,modLimit=limits[mod],totalUsed=Object.values(queryCounters).reduce((a,b)=>a+b,0),totalLeft=limits.total===-1?Infinity:Math.max(0,limits.total-totalUsed);
     let msg;
     if(modUsed===0&&totalLeft===0)msg='<strong>Sem consultas</strong> — limite diário total atingido';
     else if(modUsed>=modLimit)msg='<strong>Sem consultas</strong> — limite deste módulo atingido';
@@ -461,41 +529,59 @@ function updateMiniBalloon(mod) {
   }
 }
 
-function renderHistory() {
+async function renderHistoryContent() {
   const el=document.getElementById('historyContent'); if(!el)return;
-  if(!currentUser||currentUser.anon){el.innerHTML=`<div class="hist-empty">Faça login para usar o histórico.</div>`;return;}
-  const enabled=histEnabled(), list=LS.get(HIST_KEY(currentUser.email))||[];
+  const enabled=histEnabled();
+  let html='';
+  if(!enabled){
+    el.querySelector('#histBody') ? el.querySelector('#histBody').innerHTML=`<div class="hist-empty">Ative o histórico para começar a registrar suas atividades.</div>` : null;
+    if(!document.getElementById('histBody')) el.innerHTML=(el.querySelector('.hist-toggle-row')?.outerHTML||'')+`<div id="histBody"><div class="hist-empty">Ative o histórico para começar a registrar suas atividades.</div></div>`;
+    return;
+  }
+  const body=document.getElementById('histBody');
+  if(body) body.innerHTML=`<div class="hist-empty" style="opacity:.5">Carregando...</div>`;
+  const list=await histLoad();
   const months={};
   list.forEach(item=>{const d=new Date(item.ts),key=`${d.getFullYear()}-${d.getMonth()}`,label=d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});if(!months[key])months[key]={label,items:[]};months[key].items.push(item);});
   const typeIco={
     consulta:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>`,
-    credito: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
-    plano:   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
-    produto: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`,
+    credito:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+    plano:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+    produto:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`,
   };
-  let html=`<div class="hist-toggle-row"><div class="hist-toggle-info"><div class="hist-toggle-title">Salvar histórico</div><div class="hist-toggle-sub">Suas consultas, compras de créditos, planos e produtos ficam salvos na sua conta.</div></div><label class="hist-toggle"><input type="checkbox" id="histToggleChk" ${enabled?'checked':''} onchange="histSetEnabled(this.checked);renderHistory()"><span class="hist-slider"></span></label></div>`;
-  if(!enabled){html+=`<div class="hist-empty">Ative o histórico para começar a registrar suas atividades.</div>`;el.innerHTML=html;return;}
-  if(list.length===0){html+=`<div class="hist-empty">Nenhuma atividade registrada ainda.<br>As próximas consultas e transações aparecerão aqui.</div>`;el.innerHTML=html;return;}
-  html+=`<div class="hist-list-wrap" id="histListWrap">`;
-  Object.values(months).forEach(({label,items})=>{
-    html+=`<div class="hist-month">${label}</div>`;
-    items.forEach(item=>{
-      const d=new Date(item.ts),dateStr=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-      const valStr=item.free?'Grátis':item.value?`R$ ${Number(item.value).toFixed(2).replace('.',',')}`:'—';
-      const valClass=item.free?'free':item.value?'paid':'';
-      let ico=typeIco[item.type]||typeIco.consulta,icoColor='var(--p)',label2='',sublabel=item.name;
-      if(item.type==='consulta'){const sep=item.name.indexOf(' — ');if(sep!==-1){label2=item.name.slice(0,sep);sublabel=item.name.slice(sep+3);}const modKey=Object.entries(MODS).find(([k,v])=>v.name===label2)?.[0];if(modKey&&MOD_SVGS[modKey]){ico=MOD_SVGS[modKey].replace('width="22" height="22"','width="14" height="14"');icoColor=modKey==='foto'?'var(--p3)':'var(--p)';}}else{label2=item.name;sublabel='';}
-      html+=`<div class="hist-item"><div class="hist-ico" style="color:${icoColor}">${ico}</div><div class="hist-info"><div class="hist-name">${label2}</div>${sublabel?`<div class="hist-date" style="color:var(--muted2);font-size:.72rem;margin-top:1px">${sublabel}</div>`:''}<div class="hist-date">${dateStr}</div></div><div class="hist-val ${valClass}">${valStr}</div></div>`;
+  if(list.length===0){html=`<div class="hist-empty">Nenhuma atividade registrada ainda.<br>As próximas consultas e transações aparecerão aqui.</div>`;}
+  else{
+    html+=`<div class="hist-list-wrap" id="histListWrap">`;
+    Object.values(months).forEach(({label,items})=>{
+      html+=`<div class="hist-month">${label}</div>`;
+      items.forEach(item=>{
+        const d=new Date(item.ts),dateStr=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        const valStr=item.value?`R$ ${Number(item.value).toFixed(2).replace('.',',')}`:(item.quota?'1 consulta':(item.free?'Grátis':'—'));
+        const valClass=item.value?'paid':(item.quota?'quota':(item.free?'free':''));
+        let ico=typeIco[item.type]||typeIco.consulta,icoColor='var(--p)',label2='',sublabel=item.name;
+        if(item.type==='consulta'){const sep=item.name.indexOf(' — ');if(sep!==-1){label2=item.name.slice(0,sep);sublabel=item.name.slice(sep+3);}const modKey=Object.entries(MODS).find(([k,v])=>v.name===label2)?.[0];if(modKey&&MOD_SVGS[modKey]){ico=MOD_SVGS[modKey].replace('width="22" height="22"','width="14" height="14"');icoColor=modKey==='foto'?'var(--p3)':'var(--p)';}}else{label2=item.name;sublabel='';}
+        html+=`<div class="hist-item"><div class="hist-ico" style="color:${icoColor}">${ico}</div><div class="hist-info"><div class="hist-name">${label2}</div>${sublabel?`<div class="hist-date" style="color:var(--muted2);font-size:.72rem;margin-top:1px">${sublabel}</div>`:''}<div class="hist-date">${dateStr}</div></div><div class="hist-val ${valClass}">${valStr}</div></div>`;
+      });
     });
-  });
-  html+=`</div><button class="hist-delete-btn" onclick="document.getElementById('confirmClearHistory').classList.add('open')">Apagar histórico</button>`;
-  el.innerHTML=html;
+    html+=`</div><button class="hist-delete-btn" onclick="document.getElementById('confirmClearHistory').classList.add('open')">Apagar histórico</button>`;
+  }
+  if(document.getElementById('histBody')) document.getElementById('histBody').innerHTML=html;
+}
+
+
+async function renderHistory() {
+  const el=document.getElementById('historyContent'); if(!el)return;
+  if(!currentUser||currentUser.anon){el.innerHTML=`<div class="hist-empty">Faça login para usar o histórico.</div>`;return;}
+  const enabled=histEnabled();
+  const toggleHtml=`<div class="hist-toggle-row"><div class="hist-toggle-info"><div class="hist-toggle-title">Salvar histórico</div><div class="hist-toggle-sub">Suas consultas, compras de créditos, planos e produtos ficam salvos na sua conta.</div></div><label class="hist-toggle"><input type="checkbox" id="histToggleChk" ${enabled?'checked':''} onchange="histSetEnabled(this.checked);renderHistoryContent()"><span class="hist-slider"></span></label></div>`;
+  el.innerHTML=toggleHtml+`<div id="histBody"></div>`;
+  await renderHistoryContent();
 }
 
 function renderSettings() {
   const el=document.getElementById('settingsContent'); if(!el)return;
   if(!currentUser||currentUser.anon){el.innerHTML=`<div class="settings-card"><div class="settings-card-title">Conta</div><div class="settings-row" style="padding:16px;flex-direction:column;gap:10px;align-items:stretch"><p style="font-size:.82rem;color:var(--muted);line-height:1.6">Você está navegando como visitante. Crie uma conta para salvar seu plano e histórico.</p><button class="modal-submit" onclick="openModal('modal-register');goBack()">Criar conta</button></div></div>`;return;}
-  const limits=PLAN_LIMITS[currentUser.plan], totalUsed=Object.values(queryCounters).reduce((a,b)=>a+b,0), totalLim=limits.total===999?'∞':limits.total, planClass='plan-badge-'+currentUser.plan;
+  const limits=PLAN_LIMITS[currentUser.plan], totalUsed=Object.values(queryCounters).reduce((a,b)=>a+b,0), totalLim=limits.total===-1?'∞':limits.total, planClass='plan-badge-'+currentUser.plan;
   const planExpiresAt=currentUser.planExpiresAt||null;
   let expiryHtml='', expiryBanner='';
   if(planExpiresAt){
@@ -507,14 +593,15 @@ function renderSettings() {
   const credBal=getCredits(currentUser.email),credBrl=creditsToReal(credBal).toFixed(2).replace('.',',');
   const credCard=credBal>0?`<div class="settings-card"><div class="settings-card-title">Créditos avulsos</div><div class="settings-row"><span class="settings-row-label">Saldo</span><span class="settings-row-val" style="font-weight:700;background:var(--grad-text);background-size:400% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 4s linear infinite">${credBrl}</span></div><div class="settings-row"><span class="settings-row-label">Créditos</span><span class="settings-row-val">${credBal} créditos</span></div><div class="settings-row" style="padding:10px 16px"><button onclick="goCreditsInfo(null,true)" style="font-size:.72rem;font-weight:600;color:var(--muted2);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:5px 14px;border-radius:99px;transition:all .15s" onmouseover="this.style.color='var(--fg)'" onmouseout="this.style.color='var(--muted2)'">Comprar mais →</button></div></div>`:`<div class="settings-card"><div class="settings-card-title">Créditos avulsos</div><div class="settings-row" style="padding:12px 16px;flex-direction:column;gap:8px;align-items:flex-start"><span style="font-size:.78rem;color:var(--muted)">Sem créditos. Use para consultas avulsas sem precisar de plano.</span><button onclick="goCreditsInfo(null,true)" style="font-size:.72rem;font-weight:600;color:var(--p3);background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);padding:5px 14px;border-radius:99px;transition:all .15s">Ver créditos →</button></div></div>`;
   const avatarSrc=getUserAvatar(currentUser.email);
-  el.innerHTML=`${expiryBanner}<div class="settings-card"><div class="settings-card-title">Perfil</div><div class="settings-avatar-wrap"><div class="settings-avatar" onclick="triggerAvatarUpload()" style="cursor:pointer" title="Trocar foto">${avatarSrc?`<img src="${avatarSrc}" alt="avatar">`:`<span>${currentUser.name[0].toUpperCase()}</span>`}</div><div class="settings-avatar-info"><div class="settings-avatar-name">${currentUser.name}</div><button onclick="triggerAvatarUpload()" class="btn-trocar-foto">Trocar foto</button>${avatarSrc?`<button onclick="removeAvatar()" style="margin-top:4px;margin-left:6px;font-size:.7rem;font-weight:500;color:var(--muted);background:rgba(255,255,255,.05);padding:4px 12px;border-radius:99px;border:1px solid var(--border);transition:all .15s">Remover</button>`:''}</div></div><div class="settings-row"><span class="settings-row-label">E-mail</span><span class="settings-row-val" style="-webkit-user-select:text;user-select:text">${currentUser.email}</span></div><div class="settings-row"><span class="settings-row-label">Plano</span><span class="settings-plan-badge ${planClass}">${limits.label}</span></div>${expiryHtml}</div>${credCard}<div class="settings-card"><div class="settings-card-title">Editar dados</div><div class="settings-row" style="flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px"><div><label class="modal-label" style="margin-bottom:5px;display:block">Nome</label><input id="set-nome" class="modal-input" type="text" value="${currentUser.name}" placeholder="Seu nome" style="width:100%"></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Nova senha</label><div class="modal-input-wrap"><input id="set-senha" class="modal-input" type="password" placeholder="Mínimo 5 caracteres" style="width:100%;padding-right:42px"><button class="modal-eye" onclick="togglePw('set-senha','set-senha-eye')" id="set-senha-eye"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Confirmar senha</label><input id="set-conf" class="modal-input" type="password" placeholder="Repita a nova senha" style="width:100%"></div><div id="set-msg" class="set-msg"></div><button class="modal-submit" onclick="saveProfileChanges()" style="margin-top:2px">Salvar alterações</button></div></div><div class="settings-card"><div class="usage-toggle-btn" onclick="toggleUsageDetail()"><span class="settings-card-title" style="border-bottom:none;padding:0">Uso hoje — ${todayStr()}</span><span class="usage-toggle-label"><span id="usageArrow" class="usage-toggle-arrow">▼</span> ver detalhes</span></div><div class="settings-row"><span class="settings-row-label">Total geral</span><div class="settings-progress-wrap"><span class="settings-progress-txt">${totalUsed} / ${totalLim}</span>${limits.total!==999?`<div class="settings-progress-bar"><div class="settings-progress-fill" style="width:${Math.min(100,(totalUsed/limits.total)*100)}%"></div></div>`:''}</div></div><div id="usageDetail" style="max-height:0;overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1)">${modRows}</div></div><div class="settings-card"><div class="settings-card-title">Preferências</div><div class="settings-row"><span class="settings-row-label">Cursor personalizado</span><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:.72rem;color:var(--muted)" id="cursorToggleLbl">${LS.get('ghost_cursor_enabled')!==false?'Ativado':'Desativado'}</span><div onclick="toggleCursorPref(this)" style="width:38px;height:22px;border-radius:99px;background:${LS.get('ghost_cursor_enabled')!==false?'var(--p)':'rgba(255,255,255,.12)'};position:relative;transition:background .2s;flex-shrink:0" id="cursorToggle"><div style="position:absolute;top:3px;left:${LS.get('ghost_cursor_enabled')!==false?'19px':'3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)" id="cursorToggleThumb"></div></div></label></div></div><div class="settings-card"><div class="settings-card-title">Conta</div><div class="settings-row" style="padding:16px"><button class="btn-logout" onclick="logoutUser()">Sair da conta</button></div></div>`;
+  el.innerHTML=`${expiryBanner}<div class="settings-card"><div class="settings-card-title">Perfil</div><div class="settings-avatar-wrap"><div class="settings-avatar" onclick="triggerAvatarUpload()" style="cursor:pointer" title="Trocar foto">${avatarSrc?`<img src="${avatarSrc}" alt="avatar">`:`<span>${currentUser.name[0].toUpperCase()}</span>`}</div><div class="settings-avatar-info"><div class="settings-avatar-name">${escStr(currentUser.name)}</div><button onclick="triggerAvatarUpload()" class="btn-trocar-foto">Trocar foto</button>${avatarSrc?`<button onclick="document.getElementById('confirmRemoveAvatar').classList.add('open')" style="margin-top:4px;margin-left:6px;font-size:.7rem;font-weight:500;color:var(--muted);background:rgba(255,255,255,.05);padding:4px 12px;border-radius:99px;border:1px solid var(--border);transition:all .15s">Remover</button>`:''}</div></div><div class="settings-row"><span class="settings-row-label">E-mail</span><span class="settings-row-val" style="-webkit-user-select:text;user-select:text">${currentUser.email}</span></div><div class="settings-row"><span class="settings-row-label">Plano</span><span class="settings-plan-badge ${planClass}">${limits.label}</span></div>${expiryHtml}</div>${credCard}<div class="settings-card"><div class="settings-card-title">Editar dados</div><div class="settings-row" style="flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px"><div><label class="modal-label" style="margin-bottom:5px;display:block">Nome</label><input id="set-nome" class="modal-input" type="text" value="${escStr(currentUser.name)}" placeholder="Seu nome" style="width:100%"></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Nova senha</label><div class="modal-input-wrap"><input id="set-senha" class="modal-input" type="password" placeholder="Mínimo 5 caracteres" style="width:100%;padding-right:42px"><button class="modal-eye" onclick="togglePw('set-senha','set-senha-eye')" id="set-senha-eye"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Confirmar senha</label><input id="set-conf" class="modal-input" type="password" placeholder="Repita a nova senha" style="width:100%"></div><div id="set-msg" class="set-msg"></div><button class="modal-submit" onclick="saveProfileChanges()" style="margin-top:2px">Salvar alterações</button></div></div><div class="settings-card"><div class="usage-toggle-btn" onclick="toggleUsageDetail()"><span class="settings-card-title" style="border-bottom:none;padding:0">Uso hoje — ${todayStr()}</span><span class="usage-toggle-label"><span id="usageArrow" class="usage-toggle-arrow">▼</span> ver detalhes</span></div><div class="settings-row"><span class="settings-row-label">Total geral</span><div class="settings-progress-wrap"><span class="settings-progress-txt">${totalUsed} / ${totalLim}</span>${limits.total!==-1?`<div class="settings-progress-bar"><div class="settings-progress-fill" style="width:${Math.min(100,(totalUsed/limits.total)*100)}%"></div></div>`:''}</div></div><div id="usageDetail" style="max-height:0;overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1)">${modRows}</div></div><div class="settings-card"><div class="settings-card-title">Preferências</div><div class="settings-row"><span class="settings-row-label">Cursor personalizado</span><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:.72rem;color:var(--muted)" id="cursorToggleLbl">${LS.get('ghost_cursor_enabled')!==false?'Ativado':'Desativado'}</span><div onclick="toggleCursorPref(this)" style="width:38px;height:22px;border-radius:99px;background:${LS.get('ghost_cursor_enabled')!==false?'var(--p)':'rgba(255,255,255,.12)'};position:relative;transition:background .2s;flex-shrink:0" id="cursorToggle"><div style="position:absolute;top:3px;left:${LS.get('ghost_cursor_enabled')!==false?'19px':'3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)" id="cursorToggleThumb"></div></div></label></div></div><div class="settings-card"><div class="settings-card-title">Conta</div><div class="settings-row" style="padding:16px"><button class="btn-logout" onclick="logoutUser()">Sair da conta</button></div></div>`;
 }
 
 function toggleCursorPref(toggle) {
   const enabled=LS.get('ghost_cursor_enabled')!==false, newVal=!enabled;
   LS.set('ghost_cursor_enabled',newVal);
   if(toggle){toggle.style.background=newVal?'var(--p)':'rgba(255,255,255,.12)';const thumb=document.getElementById('cursorToggleThumb');if(thumb)thumb.style.left=newVal?'19px':'3px';}
-  const lbl=document.getElementById('cursorToggleLbl'); if(lbl)lbl.textContent=newVal?'Ativado':'Desativado';
+  const lbl=document.getElementById('cursorToggleLbl');
+  if(lbl){lbl.style.transition='opacity .2s';lbl.style.opacity='0';setTimeout(()=>{lbl.textContent=newVal?'Ativado':'Desativado';lbl.style.opacity='1';},200);}
   if(window._setCursorEnabled)window._setCursorEnabled(newVal);
 }
 
@@ -524,7 +611,11 @@ function toggleUsageDetail() {
   const open=d.style.maxHeight&&d.style.maxHeight!=='0px';
   d.style.maxHeight=open?'0px':d.scrollHeight+'px';
   if(arrow)arrow.classList.toggle('open',!open);
-  if(label){label.style.transition='color .2s ease';label.style.color='var(--p3)';setTimeout(()=>{label.style.color='var(--p)';},1500);}
+  if(label){
+    label.style.transition='none';
+    label.style.color='var(--p3)';
+    setTimeout(()=>{label.style.transition='color .6s ease';label.style.color='var(--p)';},200);
+  }
 }
 
 // ── CHAT DE SUPORTE ──
@@ -551,7 +642,7 @@ function _startChatPoll() {
 function _stopChatPoll() { clearInterval(_chatPollInterval); _chatPollInterval=null; }
 
 function goChat() {
-  if(!currentUser||currentUser.anon){openModal('modal-login');return;}
+  if(!currentUser||currentUser.anon){openModal('modal-register');return;}
   setTimeout(initChatStatus,80);
   _openChatPage();
 }
@@ -739,7 +830,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('mousemove',e=>{tx=(e.clientX-window.innerWidth/2)*0.18;ty=(e.clientY-window.innerHeight/2)*0.14;});
   function animLight(){cx+=(tx-cx)*0.06;cy+=(ty-cy)*0.06;light.style.transform=`translate(calc(-50% + ${cx}px), calc(-50% + ${cy}px))`;requestAnimationFrame(animLight);}
   requestAnimationFrame(animLight);
-  const obs=new MutationObserver(mutations=>{for(const m of mutations){if(m.target.classList.contains('active')){light.classList.toggle('hidden',m.target.id!=='page-home');break;}}});
+  // Fade-in inicial com delay
+  setTimeout(()=>light.classList.add('visible'), 400);
+  // Toggle baseado na página ativa — persiste nas outras páginas mas mais fraco
+  const obs=new MutationObserver(mutations=>{for(const m of mutations){if(m.target.classList.contains('active')){const isHome=m.target.id==='page-home';light.classList.remove('hidden');light.style.opacity=isHome?'':'0.75';break;}}});
   document.querySelectorAll('.page').forEach(p=>obs.observe(p,{attributes:true,attributeFilter:['class']}));
 })();
 
