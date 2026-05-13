@@ -56,6 +56,57 @@
     <div class="modal-footer">Já tem uma conta? <a onclick="switchModal('modal-register','modal-login')">Entrar</a></div>
   </div>
 </div>
+<!-- MODAL PAGAMENTO PIX -->
+<div class="modal-overlay" id="modal-pagamento" onclick="if(event.target===this)closeModal('modal-pagamento')">
+  <div class="modal pix-modal">
+    <button class="modal-close" onclick="closeModal('modal-pagamento')"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg></button>
+
+    <div class="pix-header">
+      <div class="pix-icon-wrap">
+        <svg width="28" height="28" viewBox="0 0 512 512" fill="currentColor"><path d="M242.4 292.5C247.8 287.1 257.1 287.1 262.5 292.5L339.5 369.5C353.7 383.7 372.6 391.5 392.6 391.5H407.7L310.6 488.6C280.3 518.1 231.1 518.1 200.8 488.6L103.3 391.2H112.6C132.6 391.2 151.5 383.4 165.7 369.2L242.4 292.5zM262.5 218.9C256.1 224.4 247.9 224.5 242.4 218.9L165.7 142.2C151.5 127.1 132.6 120.2 112.6 120.2H103.3L200.7 22.76C231.1-7.586 280.3-7.586 310.6 22.76L407.8 119.9H392.6C372.6 119.9 353.7 127.7 339.5 141.9L262.5 218.9zM112.6 142.7C126.4 142.7 139.1 148.3 149.7 158.1L226.4 234.8C233.6 241.1 243 245.6 252.5 245.6C261.9 245.6 271.3 241.1 278.5 234.8L355.5 157.8C365.3 148.1 378.8 142.5 392.6 142.5H430.3L488.6 200.8C518.9 231.1 518.9 280.3 488.6 310.6L430.3 368.9H392.6C378.8 368.9 365.3 363.3 355.5 353.6L278.5 276.6C264.6 262.7 240.3 262.7 226.4 276.6L149.7 353.2C139.1 363 126.4 368.6 112.6 368.6H80.78L22.41 310.2C-7.918 279.9-7.918 230.7 22.41 200.4L80.78 142H112.6z"/></svg>
+      </div>
+      <div>
+        <h2 class="pix-title">Concluir pagamento</h2>
+        <p class="pix-subtitle">Use o app do seu banco para pagar</p>
+      </div>
+    </div>
+
+    <div class="pix-valor-row">
+      <span class="pix-label">Valor</span>
+      <span class="pix-valor" id="pixValor">R$ 0,00</span>
+    </div>
+
+    <div class="pix-qr-wrap">
+      <div class="pix-qr-inner">
+        <div id="pixQrCode" class="pix-qr-placeholder">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h1v1h-1zM16 14h1v1h-1zM18 14h3v1h-3zM14 16h1v1h-1zM16 16h1v3h-1zM18 16h1v1h-1zM20 16h1v1h-1zM14 18h1v3h-1zM18 18h1v1h-1zM20 18h1v1h-1zM18 20h3v1h-3z"/></svg>
+          <span>QR Code aparece aqui</span>
+        </div>
+      </div>
+      <div class="pix-expires" id="pixExpira">Expira em <strong id="pixTimer">15:00</strong></div>
+    </div>
+
+    <div class="pix-copy-row">
+      <input class="pix-copy-input" id="pixChave" readonly placeholder="Chave PIX carregando...">
+      <button class="pix-copy-btn" onclick="copiarPixChave()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar
+      </button>
+    </div>
+
+    <div class="pix-steps">
+      <div class="pix-step"><div class="pix-step-ico"><svg width="14" height="14" viewBox="0 0 512 512" fill="currentColor"><path d="M242.4 292.5C247.8 287.1 257.1 287.1 262.5 292.5L339.5 369.5C353.7 383.7 372.6 391.5 392.6 391.5H407.7L310.6 488.6C280.3 518.1 231.1 518.1 200.8 488.6L103.3 391.2H112.6C132.6 391.2 151.5 383.4 165.7 369.2L242.4 292.5zM262.5 218.9C256.1 224.4 247.9 224.5 242.4 218.9L165.7 142.2C151.5 127.1 132.6 120.2 112.6 120.2H103.3L200.7 22.76C231.1-7.586 280.3-7.586 310.6 22.76L407.8 119.9H392.6C372.6 119.9 353.7 127.7 339.5 141.9L262.5 218.9zM112.6 142.7C126.4 142.7 139.1 148.3 149.7 158.1L226.4 234.8C233.6 241.1 243 245.6 252.5 245.6C261.9 245.6 271.3 241.1 278.5 234.8L355.5 157.8C365.3 148.1 378.8 142.5 392.6 142.5H430.3L488.6 200.8C518.9 231.1 518.9 280.3 488.6 310.6L430.3 368.9H392.6C378.8 368.9 365.3 363.3 355.5 353.6L278.5 276.6C264.6 262.7 240.3 262.7 226.4 276.6L149.7 353.2C139.1 363 126.4 368.6 112.6 368.6H80.78L22.41 310.2C-7.918 279.9-7.918 230.7 22.41 200.4L80.78 142H112.6z"/></svg></div><span>Abra o app do banco e escaneie o QR Code</span></div>
+      <div class="pix-step"><div class="pix-step-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></div><span>Ou copie a chave e cole no aplicativo</span></div>
+      <div class="pix-step"><div class="pix-step-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><span>Após o pagamento, o pedido será processado automaticamente</span></div>
+    </div>
+
+    <div class="pix-aguardando" id="pixStatus">
+      <span class="pix-dot"></span>
+      Aguardando pagamento...
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-login">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('modal-login')"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg></button>
