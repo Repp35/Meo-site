@@ -89,43 +89,89 @@ function initUpgradeCarousel(){
 }
 
 // ── COMPRA DE PLANO ──
-function buyPlan(plan,btn){
+async function buyPlan(plan,btn){
   if(!currentUser||currentUser.anon){openModal('modal-login');return;}
   const orig=btn?.innerHTML;
   if(btn){btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .6s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Processando...';btn.disabled=true;}
-  setTimeout(async()=>{
-    const oldPlan=currentUser.plan,expiresAt=new Date(Date.now()+PLAN_DURATIONS[plan]*86400000).toISOString();
-    await sbPatch('profiles',`id=eq.${encodeURIComponent(currentUser.id)}`,{plano:plan,plan_expires_at:expiresAt});
-    currentUser.plan=plan;currentUser.planExpiresAt=Date.now()+PLAN_DURATIONS[plan]*86400000;
-    queryCounters=await getDailyCounters(currentUser.email,plan);updateNavUser();
-    histAdd({type:'plano',name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`,value:null,free:false});
+  try{
+    const res=await fetch(`${SUPABASE_URL}/functions/v1/create-pix-payment`,{
+      method:'POST',
+      headers:{...SB_HEADERS},
+      body:JSON.stringify({tipo:'plano',plano:plan,user_id:currentUser.id})
+    });
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'Erro ao gerar pagamento');
     if(btn){btn.innerHTML=orig;btn.disabled=false;}
     closeMenu();
-    const planOrder=['basico','starter','pro','premium'];
-    if(planOrder.indexOf(plan)>planOrder.indexOf(oldPlan))playUpgradeAnimation(oldPlan,plan,()=>showThankYou('plan',plan));
-    else showThankYou('plan',plan);
-  },1200);
+    abrirModalPix({
+      valor:`R$ ${Number(data.valor).toFixed(2).replace('.',',')}`,
+      chave:data.qr_code,
+      qrCodeUrl:data.qr_code_base64?`data:image/png;base64,${data.qr_code_base64}`:null,
+      duracaoSegundos:900
+    });
+    iniciarPollingPix(async()=>{
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/pagamentos?payment_id=eq.${data.payment_id}&select=status`,{headers:SB_HEADERS});
+      const rows=await r.json();
+      if(rows?.[0]?.status==='paid'){
+        const oldPlan=currentUser.plan;
+        currentUser.plan=plan;currentUser.planExpiresAt=Date.now()+30*86400000;
+        queryCounters=await getDailyCounters(currentUser.email,plan);updateNavUser();
+        histAdd({type:'plano',name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`,value:null,free:false});
+        const planOrder=['basico','starter','pro','premium'];
+        if(planOrder.indexOf(plan)>planOrder.indexOf(oldPlan))playUpgradeAnimation(oldPlan,plan,()=>showThankYou('plan',plan));
+        else showThankYou('plan',plan);
+        return true;
+      }
+      return false;
+    });
+  }catch(e){
+    if(btn){btn.innerHTML=orig;btn.disabled=false;}
+    alert('Erro ao gerar PIX: '+e.message);
+  }
 }
 
-// COMPRA DE CRÉDITOS (versão completa com showThankYou)
-function buyCreditsNow(){
+async function buyCreditsNow(){
   const cost=_creditsTargetMod?(MOD_CREDITS[_creditsTargetMod]||1):1;
   const totalCred=Math.round(cost*_creditsQty*100)/100;
-  const brlBase=creditsToReal(totalCred),disc=getDiscount(brlBase),brlFinal=brlBase*(1-disc.pct/100);
+  const brlBase=creditsToReal(totalCred),disc=getDiscount(brlBase),brlFinal=Math.round(brlBase*(1-disc.pct/100)*100)/100;
   const btn=document.getElementById('creditsBuyBtn'),orig=btn.innerHTML;
-  btn.disabled=true;btn.innerHTML=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .6s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Aguardando pagamento...`;
-  setTimeout(()=>{
+  btn.disabled=true;btn.innerHTML=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .6s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Gerando PIX...`;
+  function _refreshAllCredits(){
+    updateCreditsBalloon();if(_creditsTargetMod)updateMiniBalloon(_creditsTargetMod);
     const email=currentUser?.email;
-    if(email){addCredits(email,totalCred);histAdd({type:'credito',name:`${totalCred} créditos adicionados`,value:brlFinal.toFixed(2),free:false});}
-    function _refreshAllCredits(){
-      updateCreditsBalloon();if(_creditsTargetMod)updateMiniBalloon(_creditsTargetMod);
-      const balEl=document.getElementById('creditsBalanceInfo');if(balEl&&email){const newBal=getCredits(email);balEl.innerHTML=newBal>0?`Saldo atual: <strong style="color:var(--p3)">${fmtBrl(creditsToReal(newBal))}</strong>`:'';}
-      const walletEl=document.getElementById('walletContent');if(walletEl&&walletEl.innerHTML)renderWallet();
-      const setEl=document.getElementById('settingsContent');if(setEl&&setEl.innerHTML)renderSettings();
-    }
-    _refreshAllCredits();
-    btn.innerHTML=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Créditos adicionados!`;
-    btn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
-    setTimeout(()=>{btn.innerHTML=orig;btn.disabled=false;btn.style.background='';_refreshAllCredits();showThankYou('credits',brlFinal.toFixed(2));},900);
-  },1500);
+    const balEl=document.getElementById('creditsBalanceInfo');if(balEl&&email){const newBal=getCredits(email);balEl.innerHTML=newBal>0?`Saldo atual: <strong style="color:var(--p3)">${fmtBrl(creditsToReal(newBal))}</strong>`:'';}
+    const walletEl=document.getElementById('walletContent');if(walletEl&&walletEl.innerHTML)renderWallet();
+    const setEl=document.getElementById('settingsContent');if(setEl&&setEl.innerHTML)renderSettings();
+  }
+  try{
+    const res=await fetch(`${SUPABASE_URL}/functions/v1/create-pix-payment`,{
+      method:'POST',
+      headers:{...SB_HEADERS},
+      body:JSON.stringify({tipo:'credito',valor_brl:brlFinal,user_id:currentUser.id})
+    });
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'Erro ao gerar pagamento');
+    btn.innerHTML=orig;btn.disabled=false;
+    abrirModalPix({
+      valor:`R$ ${brlFinal.toFixed(2).replace('.',',')}`,
+      chave:data.qr_code,
+      qrCodeUrl:data.qr_code_base64?`data:image/png;base64,${data.qr_code_base64}`:null,
+      duracaoSegundos:900
+    });
+    iniciarPollingPix(async()=>{
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/pagamentos?payment_id=eq.${data.payment_id}&select=status`,{headers:SB_HEADERS});
+      const rows=await r.json();
+      if(rows?.[0]?.status==='paid'){
+        const email=currentUser?.email;
+        if(email){addCredits(email,totalCred);histAdd({type:'credito',name:`${totalCred} créditos adicionados`,value:brlFinal.toFixed(2),free:false});}
+        _refreshAllCredits();
+        showThankYou('credits',brlFinal.toFixed(2));
+        return true;
+      }
+      return false;
+    });
+  }catch(e){
+    btn.innerHTML=orig;btn.disabled=false;
+    alert('Erro ao gerar PIX: '+e.message);
+  }
 }
