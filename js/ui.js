@@ -992,8 +992,9 @@ function abrirModalPix({ valor, chave, qrCodeUrl, duracaoSegundos = 900 }) {
   document.getElementById('pixChave').value = chave || '';
 
   const qrEl = document.getElementById('pixQrCode');
-  if (qrCodeUrl) {
-    qrEl.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code PIX">`;
+  const qrInner = qrEl?.parentElement;
+  if (qrCodeUrl && qrInner) {
+    qrInner.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code PIX" style="width:156px;height:156px;object-fit:contain;display:block;">`;
   }
 
   // Timer
