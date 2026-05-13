@@ -983,3 +983,61 @@ document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend
   requestAnimationFrame(tick);
   window._setCursorEnabled=(v)=>{LS.set('ghost_cursor_enabled',v);cur.style.display=v?'':'none';trailDots.forEach(d=>d.el.style.display=v?'':'none');};
 })();
+
+/* ===== PAGAMENTO PIX ===== */
+let _pixTimerInterval = null;
+
+function abrirModalPix({ valor, chave, qrCodeUrl, duracaoSegundos = 900 }) {
+  document.getElementById('pixValor').textContent = valor || 'R$ 0,00';
+  document.getElementById('pixChave').value = chave || '';
+
+  const qrEl = document.getElementById('pixQrCode');
+  if (qrCodeUrl) {
+    qrEl.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code PIX">`;
+  }
+
+  // Timer
+  clearInterval(_pixTimerInterval);
+  let restante = duracaoSegundos;
+  const timerEl = document.getElementById('pixTimer');
+  function atualizar() {
+    const m = String(Math.floor(restante / 60)).padStart(2, '0');
+    const s = String(restante % 60).padStart(2, '0');
+    if (timerEl) timerEl.textContent = `${m}:${s}`;
+    if (restante <= 0) {
+      clearInterval(_pixTimerInterval);
+      document.getElementById('pixStatus').innerHTML = '<span style="color:#f87171">⚠ QR Code expirado. Feche e tente novamente.</span>';
+    }
+    restante--;
+  }
+  atualizar();
+  _pixTimerInterval = setInterval(atualizar, 1000);
+
+  openModal('modal-pagamento');
+}
+
+function copiarPixChave() {
+  const chave = document.getElementById('pixChave').value;
+  if (!chave) return;
+  navigator.clipboard.writeText(chave).then(() => {
+    const btn = document.querySelector('.pix-copy-btn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copiado!';
+    btn.style.background = 'rgba(0,177,149,.3)';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
+  });
+}
+
+// Para checar pagamento periodicamente (conectar à sua API)
+function iniciarPollingPix(checkFn, intervaloMs = 5000) {
+  const poll = setInterval(async () => {
+    const pago = await checkFn();
+    if (pago) {
+      clearInterval(poll);
+      clearInterval(_pixTimerInterval);
+      document.getElementById('pixStatus').innerHTML = '<span style="color:#4ade80">✓ Pagamento confirmado!</span>';
+      setTimeout(() => closeModal('modal-pagamento'), 2000);
+    }
+  }, intervaloMs);
+  return poll;
+}
