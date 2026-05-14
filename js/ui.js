@@ -1001,9 +1001,11 @@ function abrirModalPix({ valor, chave, qrCodeUrl, duracaoSegundos = 900 }) {
   const qrEl = document.getElementById('pixQrCode');
   if (qrEl) {
     if (qrCodeUrl) {
-      qrEl.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code PIX" style="width:160px;height:160px;object-fit:contain;display:block;border-radius:8px;">`;
+      // Imagem preenche todo o frame branco — sem padding extra interno
+      qrEl.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code PIX" style="width:100%;height:100%;object-fit:contain;display:block;">`;
+      qrEl.style.padding = '6px'; // margem branca ao redor do QR
     } else {
-      qrEl.innerHTML = `<div class="pix-qr-loading"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" style="animation:spin .9s linear infinite;transform-origin:center"/></svg><span>QR Code aparece aqui</span></div>`;
+      qrEl.innerHTML = `<div class="pix-qr-loading"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" style="animation:spin .9s linear infinite;transform-origin:center"/></svg><span>Gerando QR Code...</span></div>`;
     }
   }
 
