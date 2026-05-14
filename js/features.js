@@ -92,7 +92,8 @@ function initUpgradeCarousel(){
 async function buyPlan(plan,btn){
   if(!currentUser||currentUser.anon){openModal('modal-login');return;}
   const orig=btn?.innerHTML;
-  if(btn){btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .6s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Processando...';btn.disabled=true;}
+  const loadingHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .6s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Processando...';
+  if(btn){btn.innerHTML=loadingHTML;btn.disabled=true;}
   try{
     const res=await fetch(`${SUPABASE_URL}/functions/v1/create-pix-payment`,{
       method:'POST',
@@ -110,23 +111,31 @@ async function buyPlan(plan,btn){
       duracaoSegundos:900
     });
     iniciarPollingPix(async()=>{
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/pagamentos?payment_id=eq.${data.payment_id}&select=status`,{headers:SB_HEADERS});
-      const rows=await r.json();
-      if(rows?.[0]?.status==='paid'){
-        const oldPlan=currentUser.plan;
-        currentUser.plan=plan;currentUser.planExpiresAt=Date.now()+30*86400000;
-        queryCounters=await getDailyCounters(currentUser.email,plan);updateNavUser();
-        histAdd({type:'plano',name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`,value:null,free:false});
-        const planOrder=['basico','starter','pro','premium'];
-        if(planOrder.indexOf(plan)>planOrder.indexOf(oldPlan))playUpgradeAnimation(oldPlan,plan,()=>showThankYou('plan',plan));
-        else showThankYou('plan',plan);
-        return true;
-      }
+      try{
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/pagamentos?payment_id=eq.${data.payment_id}&select=status`,{headers:SB_HEADERS});
+        const rows=await r.json();
+        if(rows?.[0]?.status==='paid'){
+          const oldPlan=currentUser.plan;
+          currentUser.plan=plan;currentUser.planExpiresAt=Date.now()+30*86400000;
+          queryCounters=await getDailyCounters(currentUser.email,plan);updateNavUser();
+          histAdd({type:'plano',name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`,value:null,free:false});
+          const planOrder=['basico','starter','pro','premium'];
+          if(planOrder.indexOf(plan)>planOrder.indexOf(oldPlan))playUpgradeAnimation(oldPlan,plan,()=>showThankYou('plan',plan));
+          else showThankYou('plan',plan);
+          return true;
+        }
+      }catch(_){}
       return false;
     });
   }catch(e){
     if(btn){btn.innerHTML=orig;btn.disabled=false;}
-    alert('Erro ao gerar PIX: '+e.message);
+    // Mostra erro inline no modal se já aberto, senão alert
+    const statusEl=document.getElementById('pixStatus');
+    if(statusEl&&document.getElementById('modal-pagamento')?.classList.contains('open')){
+      statusEl.innerHTML=`<span class="pix-status-dot expired"></span><span class="pix-status-text" style="color:#f87171">${e.message}</span>`;
+    }else{
+      alert('Erro ao gerar PIX: '+e.message);
+    }
   }
 }
 
