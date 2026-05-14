@@ -986,31 +986,65 @@ document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend
 
 /* ===== PAGAMENTO PIX ===== */
 let _pixTimerInterval = null;
+let _pixDuracaoTotal = 900;
 
 function abrirModalPix({ valor, chave, qrCodeUrl, duracaoSegundos = 900 }) {
-  document.getElementById('pixValor').textContent = valor || 'R$ 0,00';
-  document.getElementById('pixChave').value = chave || '';
+  // Atualiza valor no chip do header
+  const valorEl = document.getElementById('pixValor');
+  if (valorEl) valorEl.textContent = valor || 'R$ 0,00';
 
+  // Atualiza chave
+  const chaveEl = document.getElementById('pixChave');
+  if (chaveEl) chaveEl.value = chave || '';
+
+  // QR Code
   const qrEl = document.getElementById('pixQrCode');
-  const qrInner = qrEl?.parentElement;
-  if (qrCodeUrl && qrInner) {
-    qrInner.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code PIX" style="width:156px;height:156px;object-fit:contain;display:block;">`;
+  if (qrEl) {
+    if (qrCodeUrl) {
+      qrEl.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code PIX" style="width:160px;height:160px;object-fit:contain;display:block;border-radius:8px;">`;
+    } else {
+      qrEl.innerHTML = `<div class="pix-qr-loading"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" style="animation:spin .9s linear infinite;transform-origin:center"/></svg><span>QR Code aparece aqui</span></div>`;
+    }
   }
 
-  // Timer
+  // Timer com barra de progresso
   clearInterval(_pixTimerInterval);
+  _pixDuracaoTotal = duracaoSegundos;
   let restante = duracaoSegundos;
+
   const timerEl = document.getElementById('pixTimer');
+  const progressEl = document.getElementById('pixTimerProgress');
+
+  function _setStatus(html) {
+    const el = document.getElementById('pixStatus');
+    if (el) el.innerHTML = html;
+  }
+
+  // Reset status
+  _setStatus('<span class="pix-status-dot"></span><span class="pix-status-text">Aguardando pagamento...</span>');
+
   function atualizar() {
     const m = String(Math.floor(restante / 60)).padStart(2, '0');
     const s = String(restante % 60).padStart(2, '0');
     if (timerEl) timerEl.textContent = `${m}:${s}`;
+
+    // Barra de progresso
+    if (progressEl) {
+      const pct = (restante / _pixDuracaoTotal) * 100;
+      progressEl.style.width = pct + '%';
+      // Muda cor conforme urgência
+      if (pct > 40) progressEl.style.background = 'var(--grad)';
+      else if (pct > 15) progressEl.style.background = 'linear-gradient(90deg,#f59e0b,#fb923c)';
+      else progressEl.style.background = 'linear-gradient(90deg,#ef4444,#f87171)';
+    }
+
     if (restante <= 0) {
       clearInterval(_pixTimerInterval);
-      document.getElementById('pixStatus').innerHTML = '<span style="color:#f87171">⚠ QR Code expirado. Feche e tente novamente.</span>';
+      _setStatus('<span class="pix-status-dot expired"></span><span class="pix-status-text" style="color:#f87171">QR Code expirado — feche e tente novamente</span>');
     }
     restante--;
   }
+
   atualizar();
   _pixTimerInterval = setInterval(atualizar, 1000);
 
@@ -1018,27 +1052,41 @@ function abrirModalPix({ valor, chave, qrCodeUrl, duracaoSegundos = 900 }) {
 }
 
 function copiarPixChave() {
-  const chave = document.getElementById('pixChave').value;
+  const chave = document.getElementById('pixChave')?.value;
   if (!chave) return;
   navigator.clipboard.writeText(chave).then(() => {
-    const btn = document.querySelector('.pix-copy-btn');
+    const btn = document.getElementById('pixCopyBtn');
+    if (!btn) return;
     const orig = btn.innerHTML;
-    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copiado!';
-    btn.style.background = 'rgba(0,177,149,.3)';
-    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Copiado!</span>';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2200);
+  }).catch(() => {
+    // Fallback para dispositivos sem clipboard API
+    const inp = document.getElementById('pixChave');
+    if (inp) { inp.select(); document.execCommand('copy'); }
   });
 }
 
-// Para checar pagamento periodicamente (conectar à sua API)
 function iniciarPollingPix(checkFn, intervaloMs = 5000) {
   const poll = setInterval(async () => {
-    const pago = await checkFn();
-    if (pago) {
-      clearInterval(poll);
-      clearInterval(_pixTimerInterval);
-      document.getElementById('pixStatus').innerHTML = '<span style="color:#4ade80">✓ Pagamento confirmado!</span>';
-      setTimeout(() => closeModal('modal-pagamento'), 2000);
-    }
+    try {
+      const pago = await checkFn();
+      if (pago) {
+        clearInterval(poll);
+        clearInterval(_pixTimerInterval);
+        // Feedback visual de sucesso
+        const statusEl = document.getElementById('pixStatus');
+        if (statusEl) {
+          statusEl.innerHTML = '<span class="pix-status-dot success"></span><span class="pix-status-text" style="color:#4ade80;font-weight:600">Pagamento confirmado!</span>';
+          statusEl.classList.add('pix-status-paid');
+        }
+        // Progresso vai a 100% verde
+        const prog = document.getElementById('pixTimerProgress');
+        if (prog) { prog.style.width = '100%'; prog.style.background = 'linear-gradient(90deg,#22c55e,#4ade80)'; }
+        setTimeout(() => closeModal('modal-pagamento'), 2200);
+      }
+    } catch(_) {}
   }, intervaloMs);
   return poll;
 }
