@@ -1,6 +1,8 @@
-
+ 
 // ── HELPERS ──
 function escStr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── PIX PENDENTE (lógica movida para buyPlan) ──
 
 // ── STORE ──
 function _normProduct(p){if(!p)return null;return{id:p.id,name:p.name||'',desc:p.description||'',descFull:p.description||'',img:p.image_url||null,tag:Array.isArray(p.tags)?p.tags[0]||'':(p.tags||p.tag||''),price:Number(p.price)||0,priceOld:p.price_old?Number(p.price_old):null,discount:p.discount||null,buyUrl:p.buy_url||null,active:p.active!==false};}
@@ -89,15 +91,99 @@ function initUpgradeCarousel(){
 }
 
 // ── COMPRA DE PLANO ──
+const PLAN_ORDER = ['basico','starter','pro','premium'];
+
+function cancelarPlano(){
+  if(!currentUser||currentUser.anon)return;
+  document.getElementById('confirmCancelarPlano').classList.add('open');
+}
+
+async function _confirmarCancelamentoPlano(){
+  closeConfirm('confirmCancelarPlano');
+  try{
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/cancel-plan`,{
+      method:'POST',
+      headers:await getAuthHeaders()
+    });
+    const result=await r.json();
+    if(!r.ok)throw new Error(result.error||'Erro ao cancelar');
+    currentUser.plan='basico';
+    currentUser.planExpiresAt=null;
+    queryCounters=await getDailyCounters(currentUser.email,'basico');
+    updateNavUser();
+    if(typeof renderSettings==='function')renderSettings();
+    showToast('Assinatura cancelada. Você voltou para o plano Básico.');
+  }catch(e){
+    showToast('Erro ao cancelar: '+e.message,'error');
+  }
+}
+
 async function buyPlan(plan,btn){
   if(!currentUser||currentUser.anon){openModal('modal-login');return;}
+
+  // FIX 4: Bloquear downgrade — não pode comprar plano igual ou abaixo do atual
+  const curIdx=PLAN_ORDER.indexOf(currentUser.plan||'basico');
+  const newIdx=PLAN_ORDER.indexOf(plan);
+  if(newIdx<=curIdx&&currentUser.plan!=='basico'){
+    showToast(`Você já possui o plano ${PLAN_NAMES_PT[currentUser.plan]||currentUser.plan}. Só é possível fazer upgrade para um plano superior.`,'error');return;
+  }
+
+  // Verificar PIX pendente — tenta retomar silenciosamente, senão cria novo
+  try{
+    const authH=await getAuthHeaders();
+    const checkPending=await fetch(`${SUPABASE_URL}/rest/v1/pagamentos?user_id=eq.${currentUser.id}&tipo=eq.plano&plano=eq.${plan}&status=eq.pending&select=*&order=created_at.desc&limit=1`,{headers:authH});
+    const pendRows=await checkPending.json();
+    if(pendRows?.length){
+      const pend=pendRows[0];
+      const age=Date.now()-new Date(pend.created_at).getTime();
+      const restanteSeg=Math.floor((900000-age)/1000);
+      if(age<900000 && pend.qr_code){
+        // Ainda válido e tem QR — retoma silenciosamente
+        const planLabel=PLAN_NAMES_PT[plan]||plan;
+        abrirModalPix({
+          valor:pend.valor_brl?`R$ ${Number(pend.valor_brl).toFixed(2).replace('.',',')}`:'—',
+          chave:pend.qr_code,
+          qrCodeUrl:pend.qr_code_base64?`data:image/png;base64,${pend.qr_code_base64}`:null,
+          duracaoSegundos:restanteSeg
+        });
+        setTimeout(()=>{
+          iniciarPollingPix(async()=>{
+            const chk=await fetch(`${SUPABASE_URL}/functions/v1/check-pix-status`,{method:'POST',headers:await getAuthHeaders(),body:JSON.stringify({payment_id:pend.payment_id})});
+            const result=await chk.json();
+            if(result?.status==='paid'){
+              const fresh=await sbGetOne('profiles',`id=eq.${currentUser.id}`);
+              if(fresh){currentUser.plan=fresh.plano||plan;currentUser.planExpiresAt=fresh.plan_expires_at?new Date(fresh.plan_expires_at).getTime():null;}
+              queryCounters=await getDailyCounters(currentUser.email,currentUser.plan);
+              updateNavUser();
+              histAdd({type:'plano',name:`Plano ${planLabel} ativado`,value:null,free:false});
+              closeModal('modal-pagamento');
+              setTimeout(()=>showThankYou('plan',plan),250);
+              return true;
+            }
+            return false;
+          });
+        },300);
+        return;
+      }
+      // Expirado ou sem QR — cancela silenciosamente e cria novo
+      showToast('Criando novo PIX...','info');
+      await fetch(`${SUPABASE_URL}/rest/v1/pagamentos?id=eq.${pend.id}`,{
+        method:'PATCH',
+        headers:{...authH,'Content-Type':'application/json'},
+        body:JSON.stringify({status:'cancelled'})
+      });
+    }
+  }catch(_){}
+
   const orig=btn?.innerHTML;
   const loadingHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .6s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Processando...';
   if(btn){btn.innerHTML=loadingHTML;btn.disabled=true;}
   try{
+    // FIX 6: usar JWT do usuário, não anon key
+    const authH=await getAuthHeaders();
     const res=await fetch(`${SUPABASE_URL}/functions/v1/create-pix-payment`,{
       method:'POST',
-      headers:{...SB_HEADERS},
+      headers:authH,
       body:JSON.stringify({tipo:'plano',plano:plan,user_id:currentUser.id})
     });
     const data=await res.json();
@@ -112,16 +198,29 @@ async function buyPlan(plan,btn){
     });
     iniciarPollingPix(async()=>{
       try{
-        const r=await fetch(`${SUPABASE_URL}/rest/v1/pagamentos?payment_id=eq.${data.payment_id}&select=status`,{headers:SB_HEADERS});
-        const rows=await r.json();
-        if(rows?.[0]?.status==='paid'){
+        const r=await fetch(`${SUPABASE_URL}/functions/v1/check-pix-status`,{
+          method:'POST',
+          headers:await getAuthHeaders(),
+          body:JSON.stringify({payment_id:data.payment_id})
+        });
+        const result=await r.json();
+        if(result?.status==='paid'){
           const oldPlan=currentUser.plan;
-          currentUser.plan=plan;currentUser.planExpiresAt=Date.now()+30*86400000;
-          queryCounters=await getDailyCounters(currentUser.email,plan);updateNavUser();
+          const fresh=await sbGetOne('profiles',`id=eq.${currentUser.id}`);
+          if(fresh){
+            currentUser.plan=fresh.plano||plan;
+            currentUser.planExpiresAt=fresh.plan_expires_at?new Date(fresh.plan_expires_at).getTime():null;
+          }else{
+            currentUser.plan=plan;
+            currentUser.planExpiresAt=Date.now()+30*86400000;
+          }
+          queryCounters=await getDailyCounters(currentUser.email,currentUser.plan);
+          updateNavUser();
           histAdd({type:'plano',name:`Plano ${PLAN_NAMES_PT[plan]||plan} ativado`,value:null,free:false});
-          const planOrder=['basico','starter','pro','premium'];
-          if(planOrder.indexOf(plan)>planOrder.indexOf(oldPlan))playUpgradeAnimation(oldPlan,plan,()=>showThankYou('plan',plan));
-          else showThankYou('plan',plan);
+          // Fechar o modal ANTES de navegar (fix modal fantasma)
+          closeModal('modal-pagamento');
+          if(PLAN_ORDER.indexOf(plan)>PLAN_ORDER.indexOf(oldPlan))setTimeout(()=>playUpgradeAnimation(oldPlan,plan,()=>showThankYou('plan',plan)),250);
+          else setTimeout(()=>showThankYou('plan',plan),250);
           return true;
         }
       }catch(_){}
@@ -129,12 +228,11 @@ async function buyPlan(plan,btn){
     });
   }catch(e){
     if(btn){btn.innerHTML=orig;btn.disabled=false;}
-    // Mostra erro inline no modal se já aberto, senão alert
     const statusEl=document.getElementById('pixStatus');
     if(statusEl&&document.getElementById('modal-pagamento')?.classList.contains('open')){
       statusEl.innerHTML=`<span class="pix-status-dot expired"></span><span class="pix-status-text" style="color:#f87171">${e.message}</span>`;
     }else{
-      alert('Erro ao gerar PIX: '+e.message);
+      showToast('Erro ao gerar PIX: '+e.message,'error');
     }
   }
 }
@@ -143,6 +241,13 @@ async function buyCreditsNow(){
   const cost=_creditsTargetMod?(MOD_CREDITS[_creditsTargetMod]||1):1;
   const totalCred=Math.round(cost*_creditsQty*100)/100;
   const brlBase=creditsToReal(totalCred),disc=getDiscount(brlBase),brlFinal=Math.round(brlBase*(1-disc.pct/100)*100)/100;
+
+  // Validação de valor mínimo (espelha o backend)
+  if(brlFinal < 1.50){
+    showToast('Valor mínimo para compra de créditos é R$1,50.','error');
+    return;
+  }
+
   const btn=document.getElementById('creditsBuyBtn'),orig=btn.innerHTML;
   btn.disabled=true;btn.innerHTML=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .6s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Gerando PIX...`;
   function _refreshAllCredits(){
@@ -155,8 +260,8 @@ async function buyCreditsNow(){
   try{
     const res=await fetch(`${SUPABASE_URL}/functions/v1/create-pix-payment`,{
       method:'POST',
-      headers:{...SB_HEADERS},
-      body:JSON.stringify({tipo:'credito',valor_brl:brlFinal,user_id:currentUser.id})
+      headers:await getAuthHeaders(),
+      body:JSON.stringify({tipo:'credito',valor_brl:brlFinal})
     });
     const data=await res.json();
     if(!res.ok)throw new Error(data.error||'Erro ao gerar pagamento');
@@ -168,19 +273,26 @@ async function buyCreditsNow(){
       duracaoSegundos:900
     });
     iniciarPollingPix(async()=>{
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/pagamentos?payment_id=eq.${data.payment_id}&select=status`,{headers:SB_HEADERS});
-      const rows=await r.json();
-      if(rows?.[0]?.status==='paid'){
-        const email=currentUser?.email;
-        if(email){addCredits(email,totalCred);histAdd({type:'credito',name:`${totalCred} créditos adicionados`,value:brlFinal.toFixed(2),free:false});}
+      const r=await fetch(`${SUPABASE_URL}/functions/v1/check-pix-status`,{
+        method:'POST',
+        headers:await getAuthHeaders(),
+        body:JSON.stringify({payment_id:data.payment_id})
+      });
+      const result=await r.json();
+      if(result?.status==='paid'){
+        const fresh=await sbGetOne('profiles',`id=eq.${currentUser.id}`);
+        if(fresh&&typeof fresh.creditos==='number'){currentUser._credits=fresh.creditos;}
+        histAdd({type:'credito',name:`${totalCred} créditos adicionados`,value:brlFinal.toFixed(2),free:false});
         _refreshAllCredits();
-        showThankYou('credits',brlFinal.toFixed(2));
+        // Fechar o modal ANTES de navegar para thank you (fix do modal que ficava aberto)
+        closeModal('modal-pagamento');
+        setTimeout(()=>showThankYou('credits',brlFinal.toFixed(2)),250);
         return true;
       }
       return false;
     });
   }catch(e){
     btn.innerHTML=orig;btn.disabled=false;
-    alert('Erro ao gerar PIX: '+e.message);
+    showToast('Erro ao gerar PIX: '+e.message,'error');
   }
 }
