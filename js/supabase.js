@@ -14,6 +14,7 @@ async function getAuthHeaders() {
     'Authorization': 'Bearer ' + (token || SUPABASE_ANON)
   };
 }
+window.getAuthHeaders = getAuthHeaders;
 
 window.sbGet = async function(table, query='') {
   try {
