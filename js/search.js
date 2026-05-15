@@ -69,6 +69,28 @@ function shake() {
 }
 
 // ── LOADING ──
+let _searchAbortController = null;
+let _cancelBtnTimer = null;
+
+function _showCancelBtn() {
+  const btn = document.getElementById('ldCancelBtn');
+  if (btn) btn.style.display = 'flex';
+}
+function _hideCancelBtn() {
+  const btn = document.getElementById('ldCancelBtn');
+  if (btn) btn.style.display = 'none';
+  if (_cancelBtnTimer) { clearTimeout(_cancelBtnTimer); _cancelBtnTimer = null; }
+}
+function cancelSearch() {
+  if (_searchAbortController) {
+    _searchAbortController.abort();
+    _searchAbortController = null;
+  }
+  _hideCancelBtn();
+  hideLd();
+  renderErr('Consulta cancelada', 'Você cancelou a consulta. Tente novamente quando quiser.');
+}
+window.cancelSearch = cancelSearch;
 const STEPS={
   cpf:    ['Validando CPF...','Buscando na base...','Montando resultado...'],
   cpfpro: ['Validando CPF...','Buscando dados completos...','Montando resultado...'],
@@ -96,15 +118,22 @@ function stepMsg(n,m){const el=document.getElementById('ls'+n+'t');if(el)el.text
 function showLd(mod){
   const msgs=STEPS[mod]||['Iniciando...','Consultando...','Finalizando...'];
   [1,2,3].forEach(i=>{stepSet(i,'');stepMsg(i,msgs[i-1]||'...')});
+  _hideCancelBtn();
   document.getElementById('ld').classList.add('on');stepSet(1,'on');
+  // mostra botão de cancelar após 8s
+  _cancelBtnTimer = setTimeout(_showCancelBtn, 8000);
 }
-function hideLd(){document.getElementById('ld').classList.remove('on')}
+function hideLd(){document.getElementById('ld').classList.remove('on');_hideCancelBtn();}
 
 // ── SAFE FETCH ──
 async function sf(url,opts={},ms=9000){
   const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),ms);
+  // encadeia com o cancel global
+  const onCancel = () => ctrl.abort();
+  if (_searchAbortController) _searchAbortController.signal.addEventListener('abort', onCancel);
   try{const r=await fetch(url,{...opts,signal:ctrl.signal});clearTimeout(t);return r;}
   catch{clearTimeout(t);return null;}
+  finally{ if (_searchAbortController) _searchAbortController.signal.removeEventListener('abort', onCancel); }
 }
 async function sfJSON(url,opts,ms){const r=await sf(url,opts,ms);if(!r||!r.ok)return null;try{return await r.json();}catch{return null;}}
 const CORS_PROXIES=[
@@ -554,7 +583,12 @@ async function _runSearch(useCredits = false, skipCount = false) {
   const t0 = Date.now();
   const MIN_MS = 900;
 
+  // cria controller de cancelamento para esta busca
+  _searchAbortController = new AbortController();
+  const signal = _searchAbortController.signal;
+
   async function _doApiCall() {
+    if (signal.aborted) return null;
     if (curMod==='cpf'||curMod==='cpfpro') return await searchCPF(val);
     else if(curMod==='cnpj')  return await searchCNPJ(val);
     else if(curMod==='cep')   return await searchCEP(val);
@@ -572,11 +606,16 @@ async function _runSearch(useCredits = false, skipCount = false) {
     // Sempre tenta a API real primeiro
     res = await _doApiCall();
 
+    // Se cancelado durante a chamada, para aqui
+    if (signal.aborted) return;
+
     // Se falhou (cooldown/erro), aguarda 1.8s e tenta novamente
     if ((!res || res.length === 0) && !isGhost) {
       stepMsg(1, 'Aguardando API...');
       await new Promise(r => setTimeout(r, 1800));
+      if (signal.aborted) return;
       res = await _doApiCall();
+      if (signal.aborted) return;
     }
 
     // ghost: se a API não retornou nada, cai no mock como fallback
@@ -596,6 +635,7 @@ async function _runSearch(useCredits = false, skipCount = false) {
 
     const elapsed = Date.now() - t0;
     if (elapsed < MIN_MS) await new Promise(r => setTimeout(r, MIN_MS - elapsed));
+    if (signal.aborted) return;
     if (res && res.length > 0) {
       if (!skipCount) {
         if (useCredits) { spendCredits(curMod); playCreditsAnimation(); }
@@ -606,7 +646,12 @@ async function _runSearch(useCredits = false, skipCount = false) {
     }
     stepSet(3,'done'); hideLd(); pushNav('results'); renderResults(res);
     updateResultsBanner(curMod);
-  }catch(e){ hideLd(); renderErr('Erro inesperado','Verifique sua conexão e tente novamente.'); }
+  }catch(e){
+    if (signal.aborted) return; // cancelado pelo usuário, já tratado
+    hideLd(); renderErr('Erro inesperado','Verifique sua conexão e tente novamente.');
+  } finally {
+    _searchAbortController = null;
+  }
 }
 
 // ── UPGRADE BLOCK ──
