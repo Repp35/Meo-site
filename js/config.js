@@ -8,12 +8,12 @@ const PLAN_LIMITS = {
   premium: { label:'Premium', cpf:-1, cpfpro:-1, cnpj:-1, cep:-1, ip:-1, whois:-1, nome:-1, familiares:-1, telefone:-1, email:-1, placa:-1, cnh:-1, foto:2,  pix:-1,  cns:-1,  renavam:-1,  total:-1  },
 };
 
-// CORES DOS PLANOS (único lugar, evita duplicação)
+// CORES DOS PLANOS (único lugar, evita duplicação) — paleta azul-índigo coesa
 const PLAN_COLORS = {
-  basico:  { grad:'linear-gradient(135deg,#22c55e,#16a34a)', glow:'rgba(34,197,94,.5)',  label:'Básico'  },
-  starter: { grad:'linear-gradient(135deg,#a855f7,#7c3aed)', glow:'rgba(168,85,247,.5)', label:'Starter' },
-  pro:     { grad:'linear-gradient(135deg,#a855f7,#c026d3)', glow:'rgba(192,38,211,.5)', label:'Pro'     },
-  premium: { grad:'linear-gradient(135deg,#f472b6,#c026d3)', glow:'rgba(244,114,182,.5)',label:'Premium' },
+  basico:  { grad:'linear-gradient(135deg,#6366f1,#4f46e5)', glow:'rgba(99,102,241,.45)',  label:'Básico'  },
+  starter: { grad:'linear-gradient(135deg,#818cf8,#6366f1)', glow:'rgba(129,140,248,.45)', label:'Starter' },
+  pro:     { grad:'linear-gradient(135deg,#a5b4fc,#818cf8)', glow:'rgba(165,180,252,.45)', label:'Pro'     },
+  premium: { grad:'linear-gradient(135deg,#c7d2fe,#a5b4fc)', glow:'rgba(199,210,254,.4)', label:'Premium' },
 };
 
 // ── CRÉDITOS ──
@@ -30,10 +30,10 @@ const CREDIT_DISCOUNTS = [
   { minBrl:  2.70, pct:  0, label: ''         },
 ];
 const PLAN_BADGE_COLORS = {
-  basico:  { bg:'rgba(74,222,128,.08)',  color:'#4ade80', border:'rgba(74,222,128,.22)' },
-  starter: { bg:'rgba(168,85,247,.1)',   color:'#c084fc', border:'rgba(168,85,247,.28)' },
-  pro:     { bg:'rgba(192,38,211,.1)',   color:'#e879f9', border:'rgba(192,38,211,.28)' },
-  premium: { bg:'rgba(244,114,182,.1)',  color:'#f472b6', border:'rgba(244,114,182,.28)' },
+  basico:  { bg:'rgba(99,102,241,.08)',   color:'#818cf8', border:'rgba(99,102,241,.2)'  },
+  starter: { bg:'rgba(129,140,248,.09)',  color:'#a5b4fc', border:'rgba(129,140,248,.22)' },
+  pro:     { bg:'rgba(165,180,252,.09)',  color:'#c7d2fe', border:'rgba(165,180,252,.22)' },
+  premium: { bg:'rgba(199,210,254,.08)',  color:'#e0e7ff', border:'rgba(199,210,254,.2)'  },
 };
 
 // PLANOS — duração e nomes
