@@ -23,7 +23,7 @@ function clearSession() {} // mantido por compatibilidade — não faz mais nada
 // ── HELPERS DE CRÉDITOS ──
 function getCredits(email) {
   if (!email) return 0;
-  if (currentUser && currentUser.email === email && typeof currentUser._credits === 'number') return currentUser._credits;
+  if (currentUser && currentUser.email === email && typeof currentUser._credits === 'number') return Math.round(currentUser._credits * 100) / 100;
   return 0;
 }
 function setCredits(email, val) {
@@ -385,6 +385,16 @@ function updateCreditsBalloon() {
 let _creditsTargetMod = null;
 let _creditsQty = 1;
 
+const CREDITO_MIN_BRL = 1.50; // Espelha o backend
+
+function _calcQtyMin(mod) {
+  // Calcula a quantidade mínima de consultas para atingir R$1,50
+  const cost = MOD_CREDITS[mod] || 0.7;
+  if (cost <= 0) return 1; // módulo gratuito, sem mínimo relevante
+  const credMin = CREDITO_MIN_BRL / BRL_PER_CREDIT; // créditos mínimos
+  return Math.max(1, Math.ceil(credMin / cost));
+}
+
 function goCredits(mod) {
   if (!currentUser || currentUser.anon) {
     showToast('Crie uma conta para comprar créditos.', 'error');
@@ -396,7 +406,8 @@ function goCredits(mod) {
   const modName = MODS[m]?.name || m;
   const cost    = MOD_CREDITS[m] || 0.7;
 
-  _creditsQty = 1;
+  // Começa no mínimo que atinge R$1,50
+  _creditsQty = _calcQtyMin(m);
 
   document.getElementById('creditsModName').textContent = `Compra avulsa — ${modName}`;
 
@@ -405,10 +416,11 @@ function goCredits(mod) {
     : `${modName} é gratuito`;
   document.getElementById('creditsCostHint').textContent = hint;
 
-  // presets
+  // presets — filtrar só os que atingem o mínimo
   const presetsWrap = document.getElementById('creditsPresets');
   presetsWrap.innerHTML = '';
-  [1, 5, 10, 20].forEach(n => {
+  const qtyMin = _calcQtyMin(m);
+  [1, 5, 10, 20].filter(n => n >= qtyMin).forEach(n => {
     const btn = document.createElement('button');
     btn.className = 'credits-preset' + (n === _creditsQty ? ' active' : '');
     btn.textContent = n + 'x';
@@ -431,7 +443,8 @@ function goCredits(mod) {
 }
 
 function changeCreditsQty(delta) {
-  _creditsQty = Math.max(1, Math.min(100, _creditsQty + delta));
+  const qtyMin = _calcQtyMin(_creditsTargetMod || 'cpf');
+  _creditsQty = Math.max(qtyMin, Math.min(100, _creditsQty + delta));
   renderCreditsSummary();
   updatePresetsUI();
 }
@@ -553,37 +566,41 @@ async function doSearchWithCredits() {
 function toggleFaqPanel() {
   const faq = document.getElementById('faq');
   const panel = faq.querySelector('.faq-panel');
-  faq.classList.toggle('open');
-  if (faq.classList.contains('open')) {
-    // max-height dinâmico: evita cortar conteúdo se FAQ crescer
-    if (panel) panel.style.maxHeight = panel.scrollHeight + 'px';
-    setTimeout(() => faq.scrollIntoView({behavior:'smooth', block:'nearest'}), 60);
+  const isOpen = faq.classList.contains('open');
+  if (!isOpen) {
+    const scroll = panel ? panel.querySelector('.faq-scroll') : null;
+    const pH = scroll ? scroll.offsetHeight + 24 : 400;
+    faq.classList.add('open');
+    if (panel) panel.style.maxHeight = pH + 'px';
   } else {
+    faq.classList.remove('open');
     if (panel) panel.style.maxHeight = '';
   }
 }
 
 function toggleFaq(el) {
   const isOpen = el.classList.contains('open');
-  // fecha todos os outros e reseta max-height
   document.querySelectorAll('.faq-item.open').forEach(i => {
     i.classList.remove('open');
     const a = i.querySelector('.faq-a');
     if (a) a.style.maxHeight = '';
   });
   if (!isOpen) {
-    el.classList.add('open');
-    // altura dinâmica: evita corte se o texto crescer
     const a = el.querySelector('.faq-a');
-    if (a) a.style.maxHeight = a.scrollHeight + 'px';
-    // recalcula painel pai após a animação do item terminar
+    const inner = a ? a.querySelector('.faq-a-inner') : null;
     const panel = el.closest('.faq-panel');
-    if (panel) {
-      panel.style.maxHeight = panel.scrollHeight + 'px';
-      setTimeout(() => {
-        if (panel) panel.style.maxHeight = panel.scrollHeight + 'px';
-      }, 320);
-    }
+    const aH = inner ? inner.offsetHeight : 200;
+    el.classList.add('open');
+    if (a) a.style.maxHeight = aH + 'px';
+    if (panel) panel.style.maxHeight = (panel.scrollHeight + aH) + 'px';
+    // só scrolla se o item estiver fora do viewport após a animação
+    setTimeout(() => {
+      const rect = el.getBoundingClientRect();
+      const vH = window.innerHeight;
+      if (rect.bottom > vH || rect.top < 0) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 320);
   }
 }
 
@@ -1011,6 +1028,9 @@ async function _loadSession() {
 
     updateNavUser();
 
+    // Verificar pagamentos pendentes em segundo plano (cobre o caso de fechar o site e pagar)
+    _checkPendingPayments(uid).catch(() => {});
+
   } catch {
     await initAnon();
     updateNavUser();
@@ -1018,6 +1038,49 @@ async function _loadSession() {
 }
 
 // ── logout ── (ver logoutUser() abaixo, que usa confirmação de modal)
+
+// Verifica pagamentos pendentes ao logar — cobre o caso de fechar o site após pagar
+async function _checkPendingPayments(uid) {
+  try {
+    const quinzeMinAtras = new Date(Date.now() - 900000).toISOString();
+    const authH = await getAuthHeaders();
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/pagamentos?user_id=eq.${uid}&status=eq.pending&created_at=gte.${quinzeMinAtras}&select=id,payment_id,tipo,plano,valor_brl&order=created_at.desc&limit=5`,
+      { headers: authH }
+    );
+    const pendentes = await r.json();
+    if (!pendentes?.length) return;
+
+    for (const pag of pendentes) {
+      try {
+        const chk = await fetch(`${SUPABASE_URL}/functions/v1/check-pix-status`, {
+          method: 'POST',
+          headers: authH,
+          body: JSON.stringify({ payment_id: pag.payment_id })
+        });
+        const result = await chk.json();
+        if (result?.status === 'paid') {
+          // Recarregar perfil e atualizar estado
+          const fresh = await sbGetOne('profiles', `id=eq.${uid}`);
+          if (fresh) {
+            currentUser.plan = fresh.plano || currentUser.plan;
+            currentUser.planExpiresAt = fresh.plan_expires_at ? new Date(fresh.plan_expires_at).getTime() : null;
+            currentUser._credits = fresh.creditos || 0;
+            queryCounters = await getDailyCounters(currentUser.email, currentUser.plan);
+            updateNavUser();
+            // Notificar o usuário que o pagamento foi identificado
+            if (pag.tipo === 'plano') {
+              showToast(`Pagamento do Plano ${PLAN_NAMES_PT[pag.plano] || pag.plano} confirmado! Seu acesso foi liberado.`, 'success');
+            } else {
+              showToast('Seus créditos foram adicionados!', 'success');
+            }
+          }
+          break; // Um de cada vez é suficiente
+        }
+      } catch(_) {}
+    }
+  } catch(_) {}
+}
 
 // ── salva contador a cada consulta ──
 function _persistCounters() {
@@ -1108,6 +1171,7 @@ async function _doSaveProfile() {
 function openModal(id){
   if((id==='modal-login'||id==='modal-register')&&currentUser&&!currentUser.anon) return;
   closeAllModals(); document.getElementById(id).classList.add('open'); window._overlayOpen = true;
+  document.body.style.overflow = 'hidden';
 }
 function closeModal(id){
   const overlay = document.getElementById(id);
@@ -1120,7 +1184,7 @@ function closeModal(id){
     if (modal) modal.classList.remove('closing');
     if (!document.querySelector('.modal-overlay.open,.confirm-overlay.open,.csb-confirm-overlay.open')) {
       window._overlayOpen = false;
-      
+      document.body.style.overflow = '';
     }
   }, 200);
 }
@@ -1154,6 +1218,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const navActive = (() => { try { return sessionStorage.getItem('ghost_nav_active'); } catch(_) { return null; } })();
   const lastPage  = navActive ? (() => { try { return sessionStorage.getItem('ghost_last_page'); } catch(_) { return null; } })() : null;
   const hashPage  = location.hash.replace('#','');
+
+  // páginas que só fazem sentido com estado — redireciona pra home
+  const statefulOnly = ['results','query'];
+  if (statefulOnly.includes(hashPage) && !navActive) {
+    history.replaceState(null, '', location.pathname);
+    _loadSession();
+    return;
+  }
 
   const targetPage = lastPage || (deepPages.includes(hashPage) ? hashPage : null);
 
@@ -1238,8 +1310,20 @@ function togglePlanDetail(id, btn, event) {
     }
   });
 
-  if (isOpen) { _closePD(panel); }
-  else { _openPD(panel); setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150); }
+  if (isOpen) {
+    _closePD(panel);
+    setTimeout(() => {
+      const card = panel.closest('.pc');
+      if (card) {
+        const rect = card.getBoundingClientRect();
+        const vH = window.innerHeight;
+        if (rect.bottom > vH || rect.top < 0) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }, 220);
+  }
+  else { _openPD(panel); setTimeout(() => { const card = panel.closest('.pc') || panel; card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150); }
 }
 
 // ── SCROLL REVEAL ──
