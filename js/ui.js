@@ -285,7 +285,13 @@ function closeWelcomeCouponModal() {
 
 // ── INPUT DE QUANTIDADE DE CRÉDITOS ──
 function onCreditsQtyInput(el) {
-  let v=parseInt(el.value)||1; v=Math.max(1,Math.min(100,v)); _creditsQty=v; el.value=v; renderCreditsSummary(); updatePresetsUI();
+  const qtyMin = _calcQtyMin(_creditsTargetMod || 'cpf');
+  let v = parseInt(el.value) || qtyMin;
+  v = Math.max(qtyMin, Math.min(100, v));
+  _creditsQty = v;
+  el.value = v;
+  renderCreditsSummary();
+  updatePresetsUI();
 }
 
 // WALLET — renderização
@@ -328,7 +334,7 @@ function renderWallet() {
   const avatarHtml=avatar?`<img src="${avatar}" alt="avatar">`:`<span>${currentUser.name[0].toUpperCase()}</span>`;
   const buyBtn=`<button class="wallet-buy-btn" onclick="goCredits(null)"><svg width="10" height="12" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:inline-block;vertical-align:middle"><path d="M16 3L5 3C2.5 3 1 5 1 7C1 9 2.5 11 5 11L15 11C17.5 11 19 13 19 15C19 17 17.5 19 15 19L4 19" stroke="#fff" stroke-width="3" stroke-linecap="square" fill="none"/></svg>${credits>0?'Comprar mais créditos':'Comprar créditos'}</button>`;
   const knowBtn=`<button onclick="goCreditsInfo(null,true)" style="margin-top:10px;font-size:.78rem;font-weight:600;color:rgba(255,255,255,.7);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);padding:8px 22px;border-radius:99px;transition:all .2s" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,.3)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.borderColor='rgba(255,255,255,.18)'">Conhecer créditos</button>`;
-  el.innerHTML=`<div class="wallet-profile"><div class="wallet-avatar" id="walletAvatar">${avatarHtml}</div><div class="wallet-name" id="walletName">${escStr(currentUser.name)}</div><div class="wallet-plan" style="color:${pc.color}">${limits.label}</div><div class="wallet-balance"><div class="wallet-balance-label">Saldo disponível</div><div class="wallet-balance-val"${credits>0?'':' style="color:var(--muted);font-size:1.8rem"'}>${brl}</div>${credits>0?`<div class="wallet-balance-sub">${credits} crédito${credits!==1?'s':''}</div>`:''}</div>${buyBtn}${knowBtn}</div>`;
+  el.innerHTML=`<div class="wallet-profile"><div class="wallet-avatar" id="walletAvatar">${avatarHtml}</div><div class="wallet-name" id="walletName">${escStr(currentUser.name)}</div><div class="wallet-plan" style="color:${pc.color}">${limits.label}</div><div class="wallet-balance"><div class="wallet-balance-label">Saldo disponível</div><div class="wallet-balance-val"${credits>0?'':' style="color:var(--muted);font-size:1.8rem"'}>${brl}</div>${credits>0?`<div class="wallet-balance-sub">${Math.round(credits*100)/100} crédito${credits!==1?'s':''}</div>`:''}</div>${buyBtn}${knowBtn}</div>`;
   if(avatar)applyAvatarColors(el,avatar);
 }
 
@@ -484,7 +490,7 @@ function showToast(msg, type='success') {
   const t = document.createElement('div');
   t.className = '_ghost-toast';
   const isError = type === 'error';
-  t.style.cssText = `position:fixed;bottom:28px;left:50%;background:${isError?'#c0392b':'var(--p)'};color:#fff;padding:11px 24px;border-radius:99px;font-size:.82rem;font-weight:700;z-index:9999;box-shadow:0 6px 28px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap;`;
+  t.style.cssText = `position:fixed;bottom:28px;left:50%;background:${isError?'#c0392b':'var(--p)'};color:#fff;padding:11px 24px;border-radius:16px;font-size:.82rem;font-weight:700;z-index:9999;box-shadow:0 6px 28px rgba(0,0,0,.5);pointer-events:none;white-space:normal;max-width:min(360px,88vw);text-align:center;line-height:1.4;`;
   t.textContent = msg;
   document.body.appendChild(t);
   gsap.fromTo(t,
@@ -591,9 +597,9 @@ function renderSettings() {
   }
   const modRows=Object.entries(limits).filter(([k])=>!['label','total'].includes(k)).map(([mod,lim])=>{const m=MODS[mod];if(!m)return'';const used=queryCounters[mod]||0,limTxt=lim===-1?'∞':lim===0?'—':lim,pct=lim>0&&lim!==999?Math.min(100,(used/lim)*100):(used>0?30:0),barColor=lim===0?'rgba(255,255,255,.1)':pct>=90?'#f87171':pct>=60?'#fbbf24':'var(--p)';return`<div class="settings-row"><span class="settings-row-label">${m.name}</span><div class="settings-progress-wrap"><span class="settings-progress-txt">${lim===0?'Não incluso':`${used} / ${limTxt}`}</span>${lim!==0?`<div class="settings-progress-bar"><div class="settings-progress-fill" style="width:${pct}%;background:${barColor}"></div></div>`:''}</div></div>`;}).join('');
   const credBal=getCredits(currentUser.email),credBrl=creditsToReal(credBal).toFixed(2).replace('.',',');
-  const credCard=credBal>0?`<div class="settings-card"><div class="settings-card-title">Créditos avulsos</div><div class="settings-row"><span class="settings-row-label">Saldo</span><span class="settings-row-val" style="font-weight:700;background:var(--grad-text);background-size:400% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 4s linear infinite">${credBrl}</span></div><div class="settings-row"><span class="settings-row-label">Créditos</span><span class="settings-row-val">${credBal} créditos</span></div><div class="settings-row" style="padding:10px 16px"><button onclick="goCreditsInfo(null,true)" style="font-size:.72rem;font-weight:600;color:var(--muted2);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:5px 14px;border-radius:99px;transition:all .15s" onmouseover="this.style.color='var(--fg)'" onmouseout="this.style.color='var(--muted2)'">Comprar mais →</button></div></div>`:`<div class="settings-card"><div class="settings-card-title">Créditos avulsos</div><div class="settings-row" style="padding:12px 16px;flex-direction:column;gap:8px;align-items:flex-start"><span style="font-size:.78rem;color:var(--muted)">Sem créditos. Use para consultas avulsas sem precisar de plano.</span><button onclick="goCreditsInfo(null,true)" style="font-size:.72rem;font-weight:600;color:var(--p3);background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);padding:5px 14px;border-radius:99px;transition:all .15s">Ver créditos →</button></div></div>`;
+  const credCard=credBal>0?`<div class="settings-card"><div class="settings-card-title">Créditos avulsos</div><div class="settings-row"><span class="settings-row-label">Saldo</span><span class="settings-row-val" style="font-weight:700;background:var(--grad-text);background-size:400% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 4s linear infinite">${credBrl}</span></div><div class="settings-row"><span class="settings-row-label">Créditos</span><span class="settings-row-val">${Math.round(credBal*100)/100} créditos</span></div><div class="settings-row" style="padding:10px 16px"><button onclick="goCreditsInfo(null,true)" style="font-size:.72rem;font-weight:600;color:var(--muted2);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:5px 14px;border-radius:99px;transition:all .15s" onmouseover="this.style.color='var(--fg)'" onmouseout="this.style.color='var(--muted2)'">Comprar mais →</button></div></div>`:`<div class="settings-card"><div class="settings-card-title">Créditos avulsos</div><div class="settings-row" style="padding:12px 16px;flex-direction:column;gap:8px;align-items:flex-start"><span style="font-size:.78rem;color:var(--muted)">Sem créditos. Use para consultas avulsas sem precisar de plano.</span><button onclick="goCreditsInfo(null,true)" style="font-size:.72rem;font-weight:600;color:var(--p3);background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);padding:5px 14px;border-radius:99px;transition:all .15s">Ver créditos →</button></div></div>`;
   const avatarSrc=getUserAvatar(currentUser.email);
-  el.innerHTML=`${expiryBanner}<div class="settings-card"><div class="settings-card-title">Perfil</div><div class="settings-avatar-wrap"><div class="settings-avatar" onclick="triggerAvatarUpload()" style="cursor:pointer" title="Trocar foto">${avatarSrc?`<img src="${avatarSrc}" alt="avatar">`:`<span>${currentUser.name[0].toUpperCase()}</span>`}</div><div class="settings-avatar-info"><div class="settings-avatar-name">${escStr(currentUser.name)}</div><button onclick="triggerAvatarUpload()" class="btn-trocar-foto">Trocar foto</button>${avatarSrc?`<button onclick="document.getElementById('confirmRemoveAvatar').classList.add('open')" style="margin-top:4px;margin-left:6px;font-size:.7rem;font-weight:500;color:var(--muted);background:rgba(255,255,255,.05);padding:4px 12px;border-radius:99px;border:1px solid var(--border);transition:all .15s">Remover</button>`:''}</div></div><div class="settings-row"><span class="settings-row-label">E-mail</span><span class="settings-row-val" style="-webkit-user-select:text;user-select:text">${currentUser.email}</span></div><div class="settings-row"><span class="settings-row-label">Plano</span><span class="settings-plan-badge ${planClass}">${limits.label}</span></div>${expiryHtml}</div>${credCard}<div class="settings-card"><div class="settings-card-title">Editar dados</div><div class="settings-row" style="flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px"><div><label class="modal-label" style="margin-bottom:5px;display:block">Nome</label><input id="set-nome" class="modal-input" type="text" value="${escStr(currentUser.name)}" placeholder="Seu nome" style="width:100%"></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Nova senha</label><div class="modal-input-wrap"><input id="set-senha" class="modal-input" type="password" placeholder="Mínimo 5 caracteres" style="width:100%;padding-right:42px"><button class="modal-eye" onclick="togglePw('set-senha','set-senha-eye')" id="set-senha-eye"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Confirmar senha</label><input id="set-conf" class="modal-input" type="password" placeholder="Repita a nova senha" style="width:100%"></div><div id="set-msg" class="set-msg"></div><button class="modal-submit" onclick="saveProfileChanges()" style="margin-top:2px">Salvar alterações</button></div></div><div class="settings-card"><div class="usage-toggle-btn" onclick="toggleUsageDetail()"><span class="settings-card-title" style="border-bottom:none;padding:0">Uso hoje — ${todayStr()}</span><span class="usage-toggle-label"><span id="usageArrow" class="usage-toggle-arrow">▼</span> ver detalhes</span></div><div class="settings-row"><span class="settings-row-label">Total geral</span><div class="settings-progress-wrap"><span class="settings-progress-txt">${totalUsed} / ${totalLim}</span>${limits.total!==-1?`<div class="settings-progress-bar"><div class="settings-progress-fill" style="width:${Math.min(100,(totalUsed/limits.total)*100)}%"></div></div>`:''}</div></div><div id="usageDetail" style="max-height:0;overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1)">${modRows}</div></div><div class="settings-card"><div class="settings-card-title">Preferências</div><div class="settings-row"><span class="settings-row-label">Cursor personalizado</span><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:.72rem;color:var(--muted)" id="cursorToggleLbl">${LS.get('ghost_cursor_enabled')!==false?'Ativado':'Desativado'}</span><div onclick="toggleCursorPref(this)" style="width:38px;height:22px;border-radius:99px;background:${LS.get('ghost_cursor_enabled')!==false?'var(--p)':'rgba(255,255,255,.12)'};position:relative;transition:background .2s;flex-shrink:0" id="cursorToggle"><div style="position:absolute;top:3px;left:${LS.get('ghost_cursor_enabled')!==false?'19px':'3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)" id="cursorToggleThumb"></div></div></label></div></div><div class="settings-card"><div class="settings-card-title">Conta</div><div class="settings-row" style="padding:16px"><button class="btn-logout" onclick="logoutUser()">Sair da conta</button></div></div>`;
+  el.innerHTML=`${expiryBanner}<div class="settings-card"><div class="settings-card-title">Perfil</div><div class="settings-avatar-wrap"><div class="settings-avatar" onclick="triggerAvatarUpload()" style="cursor:pointer" title="Trocar foto">${avatarSrc?`<img src="${avatarSrc}" alt="avatar">`:`<span>${currentUser.name[0].toUpperCase()}</span>`}</div><div class="settings-avatar-info"><div class="settings-avatar-name">${escStr(currentUser.name)}</div><button onclick="triggerAvatarUpload()" class="btn-trocar-foto">Trocar foto</button>${avatarSrc?`<button onclick="document.getElementById('confirmRemoveAvatar').classList.add('open')" style="margin-top:4px;margin-left:6px;font-size:.7rem;font-weight:500;color:var(--muted);background:rgba(255,255,255,.05);padding:4px 12px;border-radius:99px;border:1px solid var(--border);transition:all .15s">Remover</button>`:''}</div></div><div class="settings-row"><span class="settings-row-label">E-mail</span><span class="settings-row-val" style="-webkit-user-select:text;user-select:text">${currentUser.email}</span></div><div class="settings-row"><span class="settings-row-label">Plano</span><span class="settings-plan-badge ${planClass}">${limits.label}</span></div>${expiryHtml}</div>${credCard}<div class="settings-card"><div class="settings-card-title">Editar dados</div><div class="settings-row" style="flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px"><div><label class="modal-label" style="margin-bottom:5px;display:block">Nome</label><input id="set-nome" class="modal-input" type="text" value="${escStr(currentUser.name)}" placeholder="Seu nome" style="width:100%"></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Nova senha</label><div class="modal-input-wrap"><input id="set-senha" class="modal-input" type="password" placeholder="Mínimo 5 caracteres" style="width:100%;padding-right:42px"><button class="modal-eye" onclick="togglePw('set-senha','set-senha-eye')" id="set-senha-eye"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div><div><label class="modal-label" style="margin-bottom:5px;display:block">Confirmar senha</label><input id="set-conf" class="modal-input" type="password" placeholder="Repita a nova senha" style="width:100%"></div><div id="set-msg" class="set-msg"></div><button class="modal-submit" onclick="saveProfileChanges()" style="margin-top:2px">Salvar alterações</button></div></div><div class="settings-card"><div class="usage-toggle-btn" onclick="toggleUsageDetail()"><span class="settings-card-title" style="border-bottom:none;padding:0">Uso hoje — ${todayStr()}</span><span class="usage-toggle-label"><span id="usageArrow" class="usage-toggle-arrow">▼</span> ver detalhes</span></div><div class="settings-row"><span class="settings-row-label">Total geral</span><div class="settings-progress-wrap"><span class="settings-progress-txt">${totalUsed} / ${totalLim}</span>${limits.total!==-1?`<div class="settings-progress-bar"><div class="settings-progress-fill" style="width:${Math.min(100,(totalUsed/limits.total)*100)}%"></div></div>`:''}</div></div><div id="usageDetail" style="max-height:0;overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1)">${modRows}</div></div><div class="settings-card"><div class="settings-card-title">Preferências</div><div class="settings-row"><span class="settings-row-label">Cursor personalizado</span><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:.72rem;color:var(--muted)" id="cursorToggleLbl">${LS.get('ghost_cursor_enabled')!==false?'Ativado':'Desativado'}</span><div onclick="toggleCursorPref(this)" style="width:38px;height:22px;border-radius:99px;background:${LS.get('ghost_cursor_enabled')!==false?'var(--p)':'rgba(255,255,255,.12)'};position:relative;transition:background .2s;flex-shrink:0" id="cursorToggle"><div style="position:absolute;top:3px;left:${LS.get('ghost_cursor_enabled')!==false?'19px':'3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)" id="cursorToggleThumb"></div></div></label></div></div><div class="settings-card"><div class="settings-card-title">Conta</div><div class="settings-row" style="padding:16px"><button class="btn-logout" onclick="logoutUser()">Sair da conta</button>${currentUser.plan&&currentUser.plan!=='basico'?`<button onclick="cancelarPlano()" style="margin-left:10px;font-size:.72rem;font-weight:600;color:#f87171;background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);padding:8px 14px;border-radius:.5rem;cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(248,113,113,.15)'" onmouseout="this.style.background='rgba(248,113,113,.07)'">Cancelar assinatura</button>`:""}</div></div>`;
 }
 
 function toggleCursorPref(toggle) {
@@ -787,7 +793,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 (function(){
   const canvas=document.getElementById('room3d');
   const isMobile=window.innerWidth<900;
-  const NPARTS=isMobile?10:22, INTERVAL=isMobile?1000/30:1000/45;
+  const NPARTS=isMobile?8:16, INTERVAL=isMobile?1000/15:1000/24;
   const ctx=canvas.getContext('2d');
   let W,H,cx,cy;
   function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;cx=W/2;cy=H/2;}
@@ -823,17 +829,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   requestAnimationFrame(loop);
 })();
 
-// ── LUZ HERO ──
+// ── LUZ HERO ── (estática, sem RAF)
 (function(){
   const light=document.getElementById('hero-light');if(!light)return;
-  let tx=0,ty=0,cx=0,cy=0;
-  document.addEventListener('mousemove',e=>{tx=(e.clientX-window.innerWidth/2)*0.18;ty=(e.clientY-window.innerHeight/2)*0.14;});
-  function animLight(){cx+=(tx-cx)*0.06;cy+=(ty-cy)*0.06;light.style.transform=`translate(calc(-50% + ${cx}px), calc(-50% + ${cy}px))`;requestAnimationFrame(animLight);}
-  requestAnimationFrame(animLight);
-  // Fade-in inicial com delay
-  setTimeout(()=>light.classList.add('visible'), 400);
-  // Toggle baseado na página ativa — persiste nas outras páginas mas mais fraco
-  const obs=new MutationObserver(mutations=>{for(const m of mutations){if(m.target.classList.contains('active')){const isHome=m.target.id==='page-home';light.classList.remove('hidden');light.style.opacity=isHome?'':'0.75';break;}}});
+  setTimeout(()=>light.classList.add('visible'),400);
+  const obs=new MutationObserver(mutations=>{for(const m of mutations){if(m.target.classList.contains('active')){const isHome=m.target.id==='page-home';light.style.opacity=isHome?'1':'0';break;}}});
   document.querySelectorAll('.page').forEach(p=>obs.observe(p,{attributes:true,attributeFilter:['class']}));
 })();
 
@@ -974,14 +974,12 @@ document.querySelectorAll('.page').forEach(p=>{p.addEventListener('transitionend
 (function(){
   const cur=document.getElementById('ghost-cursor');if(!cur)return;
   const hasPointer=window.matchMedia('(pointer:fine)').matches;if(!hasPointer){cur.style.display='none';return;}
-  const cursorEnabled=()=>LS.get('ghost_cursor_enabled')!==false;if(!cursorEnabled()){cur.style.display='none';return;}
-  const TRAIL_LEN=10,trailDots=[];let mx=-999,my=-999,ax=-999,ay=-999;
-  for(let i=0;i<TRAIL_LEN;i++){const d=document.createElement('div');d.className='cursor-trail-dot';const t=i/TRAIL_LEN,size=3+(1-t)*5,r1=Math.round(244-(244-168)*t),g1=Math.round(114-(114-85)*t),b1=Math.round(182+(247-182)*(1-t));d.style.cssText=`width:${size}px;height:${size}px;background:rgb(${r1},${g1},${b1});opacity:${(1-t)*.6};position:fixed;z-index:99998;pointer-events:none;border-radius:50%;mix-blend-mode:screen;transform:translate(-50%,-50%);left:-999px;top:-999px`;document.body.appendChild(d);trailDots.push({el:d,x:-999,y:-999});}
-  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});document.addEventListener('mousedown',()=>cur.classList.add('clicking'));document.addEventListener('mouseup',()=>cur.classList.remove('clicking'));
-  let positions=Array(TRAIL_LEN).fill({x:-999,y:-999});
-  function tick(){if(!cursorEnabled()){requestAnimationFrame(tick);return;}ax+=(mx-ax)*0.4;ay+=(my-ay)*0.4;cur.style.left=ax+'px';cur.style.top=ay+'px';positions=[{x:ax,y:ay},...positions.slice(0,TRAIL_LEN-1)];trailDots.forEach((dot,i)=>{dot.el.style.left=positions[i].x+'px';dot.el.style.top=positions[i].y+'px';});requestAnimationFrame(tick);}
-  requestAnimationFrame(tick);
-  window._setCursorEnabled=(v)=>{LS.set('ghost_cursor_enabled',v);cur.style.display=v?'':'none';trailDots.forEach(d=>d.el.style.display=v?'':'none');};
+  const cursorEnabled=()=>LS.get('ghost_cursor_enabled')!==false;
+  if(!cursorEnabled()){cur.style.display='none';return;}
+  document.addEventListener('mousemove',e=>{cur.style.left=e.clientX+'px';cur.style.top=e.clientY+'px';});
+  document.addEventListener('mousedown',()=>cur.classList.add('clicking'));
+  document.addEventListener('mouseup',()=>cur.classList.remove('clicking'));
+  window._setCursorEnabled=(v)=>{LS.set('ghost_cursor_enabled',v);cur.style.display=v?'':'none';};
 })();
 
 /* ===== PAGAMENTO PIX ===== */
@@ -1086,9 +1084,41 @@ function iniciarPollingPix(checkFn, intervaloMs = 5000) {
         // Progresso vai a 100% verde
         const prog = document.getElementById('pixTimerProgress');
         if (prog) { prog.style.width = '100%'; prog.style.background = 'linear-gradient(90deg,#22c55e,#4ade80)'; }
-        setTimeout(() => closeModal('modal-pagamento'), 2200);
+        // Fecha o modal imediatamente antes de navegar para a tela de agradecimento
+        closeModal('modal-pagamento');
       }
     } catch(_) {}
   }, intervaloMs);
   return poll;
+}
+
+// Retoma um PIX pendente existente
+async function retomarPixPendente(paymentId, valor, tipo) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/check-pix-status`, {
+      method: 'POST',
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ payment_id: paymentId })
+    });
+    const result = await r.json();
+    // Se já foi pago enquanto estava fora, processar normalmente
+    if (result?.status === 'paid') {
+      showToast('Pagamento já confirmado!', 'success');
+      window.location.reload();
+      return;
+    }
+    // Se ainda está pendente, reabrir o modal
+    if (result?.qr_code || result?.pix_code) {
+      abrirModalPix({
+        valor: valor,
+        chave: result.qr_code || result.pix_code,
+        qrCodeUrl: result.qr_code_base64 ? `data:image/png;base64,${result.qr_code_base64}` : null,
+        duracaoSegundos: result.expires_in || 900
+      });
+    } else {
+      showToast('Não foi possível recuperar o PIX. Tente um novo pagamento.', 'error');
+    }
+  } catch(e) {
+    showToast('Erro ao verificar PIX: ' + e.message, 'error');
+  }
 }
