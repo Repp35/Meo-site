@@ -7,7 +7,236 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#080810;--bg2:#0a0a16;--card:rgba(255,255,255,.035);--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);
+  --fg:#eef2fa;--muted:#566070;--muted2:#8fa3b8;--p:#a855f7;--p2:#c026d3;--p3:#f472b6;
+  --grad:linear-gradient(135deg,#a855f7 0%,#c026d3 50%,#f472b6 100%);
+  --grad-text:linear-gradient(90deg,#a855f7,#c084fc,#e879a8,#f9a8d4,#c084fc,#d8b4fe,#a855f7);
+  --glow:0 0 24px rgba(168,85,247,.28),0 0 50px rgba(192,38,211,.13);
+  --glow-sm:0 0 8px rgba(168,85,247,.14);--r:.5rem;
+  --font-display:'Syne',sans-serif;--font-body:'Plus Jakarta Sans',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;border:0}
+html{background:var(--bg);color:var(--fg);font-family:var(--font-body);line-height:1.5;overflow-x:hidden;-webkit-text-size-adjust:100%;font-size:clamp(13px,3.5vw,16px);touch-action:pan-x pan-y}
+body{margin:0;overflow-x:hidden;-webkit-font-smoothing:antialiased;min-height:100vh;min-height:-webkit-fill-available;background:var(--bg);touch-action:pan-x pan-y}
+button{font-family:inherit;cursor:pointer;background:none;border:none;color:inherit}
+input{font-family:inherit;color:inherit;caret-color:var(--p)}
+a{color:inherit;text-decoration:none}
+img,svg{display:block}
+*{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+input,textarea{-webkit-user-select:text;user-select:text}
+
+/* ── ANIMATIONS ── */
+@keyframes gradAni{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes ripple{0%{transform:scale(0);opacity:.4}100%{transform:scale(5);opacity:0}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pageOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(10px)}}
+@keyframes pageBack{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{to{opacity:0;visibility:hidden}}
+@keyframes stepIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+@keyframes modalIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes modalOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(12px) scale(.96)}}
+@keyframes couponPop{0%{opacity:0;transform:translateY(6px) scale(.95)}60%{transform:translateY(-2px) scale(1.02)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes couponShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+@keyframes shakeInp{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
+@keyframes inputSuccessGlow{0%{box-shadow:0 0 0 0 rgba(74,222,128,.5)}100%{box-shadow:0 0 0 6px rgba(74,222,128,0)}}
+@keyframes countPop{0%{opacity:0;transform:scale(.94)}100%{opacity:1;transform:scale(1)}}
+@keyframes storeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hFade{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+@keyframes heroLightIn{from{opacity:0}to{opacity:1}}
+@keyframes searchGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 0 0 0 rgba(168,85,247,0)}55%{box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 0 14px rgba(168,85,247,.45),0 0 30px rgba(168,85,247,.18),0 4px 16px rgba(0,0,0,.3)}}
+@keyframes menuBtnFlash{0%{border-color:rgba(168,85,247,.4);background:rgba(168,85,247,.12);box-shadow:0 0 6px rgba(168,85,247,.15)}100%{border-color:rgba(168,85,247,.13);background:rgba(168,85,247,.05);box-shadow:none}}
+@keyframes cardPreviewIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes revealCard{0%{opacity:0;transform:scale(.98)}60%{transform:scale(1.01)}100%{opacity:1;transform:scale(1)}}
+
+
+.gt{background:var(--grad-text);background-size:400% 200%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 10s linear infinite}
+/* scrollbar */
+*{scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{display:none}
+
+/* ── CANVAS / BG ── */
+#room3d{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.45}
+.dot-grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(circle,rgba(168,85,247,.04) 1px,transparent 1px);background-size:28px 28px;mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);-webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent)}
+#hero-light{position:fixed;top:40%;left:50%;width:min(1000px,140vw);height:800px;transform:translate(-50%,-50%);background:radial-gradient(ellipse 50% 40% at 48% 38%,rgba(168,85,247,.13) 0%,transparent 60%),radial-gradient(ellipse 70% 60% at 52% 52%,rgba(192,38,211,.07) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 65% 25%,rgba(244,114,182,.05) 0%,transparent 55%);filter:blur(52px);pointer-events:none;z-index:2;opacity:0;transition:opacity .6s ease;will-change:transform}
+#hero-light.visible{opacity:1}
+#hero-light.hidden{opacity:0}
+#noise-overlay{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.028;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");background-size:200px 200px}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:300;background:rgba(14,12,26,.80);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid transparent;border-image:linear-gradient(to right,transparent,rgba(168,85,247,.15) 30%,rgba(168,85,247,.15) 70%,transparent) 1;box-shadow:inset 50px 0 70px rgba(0,0,0,.22),inset -50px 0 70px rgba(0,0,0,.22),inset 0 30px 40px rgba(0,0,0,.14),inset 0 -8px 20px rgba(168,85,247,.07);transition:opacity .3s,visibility .3s,box-shadow .4s,backdrop-filter .4s,background .4s,-webkit-backdrop-filter .4s}
+nav::after{content:'';position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:60%;height:50px;background:radial-gradient(ellipse 100% 100% at 50% 100%,rgba(168,85,247,.07) 0%,rgba(244,114,182,.03) 55%,transparent 75%);pointer-events:none;opacity:0;transition:opacity .3s;filter:blur(14px)}
+nav.menu-open::after{opacity:1}
+nav.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.nav-inner{max-width:1100px;margin:0 auto;padding:0 24px;height:62px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{display:flex;align-items:center;gap:9px;font-family:var(--font-display);font-size:1.05rem;font-weight:700;letter-spacing:-.01em;cursor:pointer}
+.nav-logo-ghost{font-size:1.2rem;display:inline-block;animation:float 5s ease infinite}
+.nav-logo-dot{color:var(--p3)}
+.nav-r{display:flex;align-items:center;gap:8px;margin-left:auto;padding-left:16px}
+.nav-pill{font-family:var(--font-body);font-size:.6rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--p3);background:rgba(244,114,182,.08);border:1px solid rgba(244,114,182,.2);padding:3px 10px;border-radius:99px}
+.btn-login{font-size:.8rem;font-weight:500;color:var(--muted2);padding:6px 14px;border-radius:var(--r);border:1px solid rgba(255,255,255,.08);transition:all .15s}
+.btn-login:hover{border-color:rgba(255,255,255,.18);color:var(--fg);background:rgba(255,255,255,.04)}
+.btn-register{font-size:.75rem;font-weight:600;background:var(--grad);color:#fff;padding:7px 13px;border-radius:var(--r);box-shadow:var(--glow-sm);transition:opacity .2s,transform .15s}
+.btn-register:hover{opacity:.9;transform:translateY(-1px)}
+.nav-avatar{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px 4px 4px;border-radius:99px;border:1px solid rgba(168,85,247,.13);background:rgba(168,85,247,.05);box-shadow:inset 6px 0 10px rgba(0,0,0,.15),inset -6px 0 10px rgba(0,0,0,.15);transition:all .15s}
+.nav-avatar:hover{border-color:rgba(168,85,247,.35);background:rgba(168,85,247,.09);box-shadow:inset 6px 0 10px rgba(0,0,0,.1),inset -6px 0 10px rgba(0,0,0,.1)}
+.nav-av-circle{width:26px;height:26px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#fff;flex-shrink:0;overflow:hidden}
+.nav-av-name{font-size:.75rem;font-weight:600;max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── NAV MENU ── */
+.coupon-input-wrap{display:flex;gap:8px}
+.coupon-input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;color:var(--fg);font-size:.82rem;font-family:inherit;transition:border-color .15s;text-transform:uppercase;letter-spacing:.05em}
+.coupon-input::placeholder{color:rgba(148,163,184,.25);text-transform:none;letter-spacing:0}
+.coupon-input:focus{outline:none;border-color:rgba(168,85,247,.18)}
+.coupon-btn{padding:9px 16px;border-radius:var(--r);background:var(--grad);color:#fff;font-size:.78rem;font-weight:600;transition:opacity .15s;flex-shrink:0}
+.coupon-btn:hover{opacity:.9}
+.coupon-msg{font-size:.72rem;margin-top:8px;padding:7px 10px;border-radius:var(--r);display:none}
+.coupon-msg.success{display:block;background:rgba(74,222,128,.08);color:#4ade80;border:1px solid rgba(74,222,128,.2);animation:couponPop .35s cubic-bezier(.34,1.56,.64,1) both}
+.coupon-msg.error{display:block;background:rgba(248,113,113,.08);color:#f87171;border:1px solid rgba(248,113,113,.2);animation:couponShake .4s ease both}
+.coupon-input.applied{animation:inputSuccessGlow .6s ease forwards;border-color:rgba(74,222,128,.5) !important}
+.coupon-input.shake-inp{animation:shakeInp .4s ease;border-color:rgba(248,113,113,.5) !important}
+
+/* ── PAGES ── */
+.page{display:none !important;position:relative;z-index:2}
+.page.active{display:block !important;animation:pageIn .22s ease both}
+#page-home.active{display:flex !important;flex-direction:column}
+#page-modules.active,#page-query.active,#page-results.active,#page-settings.active,#page-history.active,#page-store.active,#page-product.active,#page-upgrade.active,#page-wallet.active,#page-credits-info.active,#page-credits.active{display:flex !important;flex-direction:column;align-items:center}
+#page-thankyou.active{display:flex !important;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}
+#page-chat.active{display:flex !important;flex-direction:column;height:100dvh;height:100vh}
+#page-store.active{animation:storeIn .25s cubic-bezier(.22,1,.36,1) both}
+
+/* ── HERO ── */
+.hero{min-height:100svh;display:flex;align-items:center;justify-content:center;text-align:center;padding:60px 24px 40px;position:relative;overflow:hidden}
+.hero-inner{position:relative;z-index:1;max-width:580px;width:100%;margin-top:-60px}
+.hero-badge{display:inline-flex;align-items:center;gap:7px;font-size:.65rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--p3);background:rgba(244,114,182,.07)!important;border:1px solid rgba(244,114,182,.18)!important;padding:.3rem 1rem;border-radius:99px!important;margin-bottom:1rem;opacity:0;animation:hFade .18s ease 0s both;will-change:opacity;backface-visibility:hidden;transition:opacity .4s ease,margin .4s ease,max-height .4s ease,padding .4s ease;overflow:hidden;max-height:60px;min-width:0;width:auto;align-self:flex-start}
+#page-home.home-visited .hero-badge,#page-home.home-visited .hero-title,#page-home.home-visited .hero-sub,#page-home.home-visited .hero-cta,#page-home.home-visited .hero-stats,#page-home.home-visited .btn-cta{animation-duration:.001s!important;animation-delay:0s!important;opacity:1!important}
+.hero-badge.hidden{opacity:0;max-height:0;margin-bottom:0;padding-top:0;padding-bottom:0;border-width:0;pointer-events:none}
+.hero-title{font-family:var(--font-body);font-size:clamp(2.2rem,7vw,3.8rem);font-weight:800;line-height:1.05;letter-spacing:-.03em;color:var(--fg);margin-bottom:.8rem;opacity:0;animation:hFade .18s ease .05s both;transition:margin-top .4s ease}
+.hero-sub{font-family:var(--font-display);font-size:.92rem;line-height:1.6;color:rgba(148,163,184,.78);max-width:360px;margin:0 auto 2.2rem;font-weight:300;letter-spacing:.01em;opacity:0;animation:hFade .18s ease .1s both;will-change:opacity;backface-visibility:hidden;transition:opacity .4s ease}
+.hero-cta{display:flex;justify-content:center;margin-bottom:3.6rem;opacity:0;animation:hFade .18s ease .15s both}
+.hero-stats{margin-top:1.8rem}
+.hero-stats{display:flex;align-items:center;justify-content:center;gap:0;opacity:0;animation:hFade .18s ease .22s both}
+.hero-stat{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 24px}
+.hero-stat:not(:last-child){border-right:1px solid rgba(255,255,255,.08)}
+.hero-stat-num{font-family:var(--font-body);font-size:1.5rem;font-weight:800;letter-spacing:-.03em;background:var(--grad-text);background-size:400% 200%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 12s linear infinite}
+.hero-stat-label{font-size:.6rem;color:rgba(148,163,184,.35);letter-spacing:.08em;text-transform:uppercase;font-weight:500}
+.btn-cta{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:10px;font-size:.9rem;font-weight:600;letter-spacing:.01em;background:transparent;color:#fff;padding:14px 36px;border-radius:.6rem;box-shadow:0 0 10px rgba(168,85,247,.11),0 0 20px rgba(192,38,211,.05),0 4px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.15);transition:opacity .2s,transform .2s,box-shadow .2s;isolation:isolate}
+.btn-cta::after{content:'';position:absolute;inset:0;border-radius:.6rem;background:linear-gradient(135deg,#7c2ff7,#a855f7,#c026d3,#e879f9,#f472b6,#c026d3,#a855f7);background-size:300% 300%;animation:blobShift 14s ease-in-out infinite;z-index:-2;pointer-events:none}
+.btn-cta::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,.04) 60%,transparent 100%);pointer-events:none;z-index:-1}
+.btn-cta:hover{opacity:.93;transform:translateY(-2px);box-shadow:0 0 13px rgba(168,85,247,.16),0 8px 28px rgba(0,0,0,.45)}
+.btn-cta:active{transform:translateY(0)}
+.btn-cta .rip{position:absolute;border-radius:50%;background:rgba(255,255,255,.22);width:10px;height:10px;animation:ripple .6s ease-out forwards;pointer-events:none}
+.btn-arrow{display:none}
+
+#plans{position:relative;background:rgba(6,6,14,.3);border-top:1px solid rgba(255,255,255,.05);padding:52px 24px 60px;display:flex;flex-direction:column;align-items:center}
+#plans::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:min(700px,100%);height:200px;background:radial-gradient(ellipse at 50% 0%,rgba(244,114,182,.06) 0%,rgba(168,85,247,.04) 45%,transparent 75%);z-index:0;pointer-events:none}
+#plans>*{position:relative;z-index:1}
+.plans-label{font-size:.62rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.4rem;display:flex;align-items:center;gap:6px;background:var(--grad-text);background-size:400% 200%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 12s linear infinite}
+.plans-label::before{content:'';width:14px;height:1px;background:var(--p);opacity:.5}
+.plans-label::after{content:'';width:14px;height:1px;background:var(--p);opacity:.5}
+.plans-title{font-family:var(--font-body);font-size:clamp(1.7rem,4vw,2.6rem);font-weight:800;letter-spacing:-.03em;text-align:center;margin-bottom:.35rem}
+.plans-sub{font-family:var(--font-display);font-size:.82rem;color:rgba(148,163,184,.5);text-align:center;margin-bottom:2rem;font-weight:600;letter-spacing:.01em}
+
+/* Plans grid - 1 col mobile, 2 tablet, 4 desktop */
+.plans-carousel-wrap{width:100%;position:relative;overflow:hidden;z-index:3;mask-image:linear-gradient(to right,transparent 0%,black 4%,black 96%,transparent 100%);-webkit-mask-image:linear-gradient(to right,transparent 0%,black 4%,black 96%,transparent 100%)}
+.plans-grid-new{display:flex;flex-direction:row;align-items:flex-start;gap:16px;overflow:visible;padding:8px 0 20px;cursor:grab;user-select:none;will-change:transform}
+.plans-grid-new.dragging{cursor:grabbing}
+.plans-grid-new .pc{flex:0 0 min(310px,86vw);min-width:0;transition:opacity .18s ease,transform .18s ease}
+.plans-grid-new .pc:not(.pc-active){opacity:.7;transform:scale(.97) translateY(3px)}
+.plans-grid-new .pc.pc-active{opacity:1!important;transform:scale(1) translateY(0)}
+.plans-dots{display:flex;gap:6px;justify-content:center;margin-top:8px}
+.plans-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.18);transition:all .2s;cursor:pointer}
+.plans-dot.active{background:var(--p3);width:18px;border-radius:3px}
+
+.pc{position:relative;background:rgba(255,255,255,.055);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);border-radius:1rem;padding:24px;transition:border-color .2s,transform .2s,box-shadow .2s;overflow:visible;box-shadow:0 4px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);z-index:10}
+.pc::before{content:'';position:absolute;inset:0;border-radius:1rem;background:linear-gradient(135deg,rgba(255,255,255,.04) 0%,transparent 60%);z-index:0;pointer-events:none}
+.pc>*{position:relative;z-index:1}
+.pc:hover{border-color:rgba(255,255,255,.18);transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08)}
+.pc.feat{background:rgba(168,85,247,.12);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-color:rgba(168,85,247,.18)}
+.pc.feat:hover{border-color:rgba(168,85,247,.55);box-shadow:0 16px 40px rgba(0,0,0,.4),0 0 24px rgba(168,85,247,.1)}
+.pc.feat2{background:rgba(244,114,182,.09);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-color:rgba(244,114,182,.2)}
+.pc.feat2:hover{border-color:rgba(244,114,182,.35);box-shadow:0 16px 40px rgba(0,0,0,.4),0 0 20px rgba(244,114,182,.08)}
+.pc-rec-badge-inline{display:inline-flex;align-items:center;font-size:.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--grad);color:#fff;padding:3px 10px;border-radius:99px;white-space:nowrap}
+.pc-tag{display:inline-flex;align-items:center;font-size:.58rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 9px;border-radius:99px;margin-bottom:10px}
+.t-free{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.25)}
+.t-starter{background:rgba(168,85,247,.12);color:#c084fc;border:1px solid rgba(168,85,247,.13)}
+.t-pro{background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.18)}
+.t-premium{background:rgba(232,121,160,.12);color:var(--p3);border:1px solid rgba(232,121,160,.25)}
+.pc-name{font-family:var(--font-body);font-size:1.1rem;font-weight:700;color:var(--fg);margin-bottom:4px}
+.pc-price{font-family:var(--font-body);font-size:2.2rem;font-weight:800;letter-spacing:-.04em;line-height:1;background:var(--grad-text);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:2px}
+.pc-price-free{font-family:var(--font-body);font-size:2.2rem;font-weight:800;letter-spacing:-.04em;line-height:1;color:#4ade80;margin-bottom:2px}
+.pc-period{font-size:.72rem;color:var(--muted);margin-bottom:14px}
+.pc-div{height:1px;background:var(--border);margin-bottom:14px}
+.pc-features{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+.pc-feature{display:flex;align-items:flex-start;gap:7px;font-size:.78rem;color:var(--muted2)}
+.pc-check{flex-shrink:0;font-size:.7rem;margin-top:2px;background:var(--grad-text);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradAni 8s linear infinite}
+.pc-feature strong{color:var(--fg);font-weight:600}
+.pc-btn{width:100%;padding:9px;border-radius:var(--r);font-size:.8rem;font-weight:600;border:1px solid var(--border2);color:var(--muted2);transition:all .15s}
+.pc-btn:hover{border-color:rgba(168,85,247,.18);color:var(--p3);background:rgba(168,85,247,.06)}
+.pc-btn:active{border-color:rgba(244,114,182,.5);color:var(--p3);background:rgba(244,114,182,.08)}
+.pc-btn.primary{background:var(--grad);color:#fff;border:none;box-shadow:var(--glow-sm);transition:opacity .2s,transform .15s}
+.pc-btn.primary:hover{opacity:.9;transform:translateY(-1px)}
+.pc-detail{overflow:hidden;max-height:0;opacity:0;margin-top:0;border-top:0px solid var(--border);transition:max-height .2s ease,opacity .15s ease,margin-top .2s ease}
+.pc-detail>*{padding-top:0;transition:padding-top .2s ease}
+.pc-btn{position:relative;z-index:2}
+.pd-mod-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;padding-top:4px}
+.pm-item{display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:4px}
+.pm-name{font-size:.7rem;color:var(--muted);flex:1}
+.pm-val{font-size:.68rem;font-weight:700;flex-shrink:0}
+.pm-val.yes{color:#4ade80;font-size:.76rem}
+.pm-val.lim{color:var(--p3)}
+.pm-val.no{color:rgba(255,255,255,.14);font-size:.76rem}
+.pc-acquired{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:600;color:#4ade80;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);padding:4px 12px;border-radius:99px;margin-bottom:8px}
+
+/* plans fade */
+.plans-drag-hint{display:flex;align-items:center;justify-content:center;gap:6px;font-size:.65rem;color:rgba(255,255,255,.2);margin-top:10px;letter-spacing:.04em;user-select:none}
+
+/* ── FAQ ── */
+#faq{width:100%;background:transparent;border-top:1px solid rgba(255,255,255,.05)}
+.faq-bar{display:flex;align-items:center;justify-content:space-between;padding:9px 24px;cursor:pointer;gap:12px;transition:background .15s}
+.faq-bar:hover{background:rgba(255,255,255,.02)}
+.faq-bar-left{display:flex;align-items:center;gap:7px}
+.faq-bar-svg{color:#2e3d4a;flex-shrink:0}
+.faq-bar-label{font-size:.65rem;font-weight:500;color:#2e3d4a;letter-spacing:.04em}
+.faq-chevron{color:#2e3d4a;font-size:.55rem;transition:transform .3s cubic-bezier(.4,0,.2,1)}
+#faq.open .faq-chevron{transform:rotate(180deg)}
+.faq-panel{max-height:0;overflow:hidden;transition:max-height .38s cubic-bezier(.4,0,.2,1)}
+/* max-height do painel é setado dinamicamente via JS para nunca cortar conteúdo */
+.faq-scroll{padding:6px 24px 18px;display:flex;flex-direction:column;gap:6px}
+.faq-item{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.055);border-radius:.6rem;overflow:hidden;cursor:pointer;transition:border-color .2s}
+.faq-item:hover{border-color:rgba(255,255,255,.09)}
+.faq-item.open{border-color:rgba(168,85,247,.2)}
+.faq-q{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;font-size:.78rem;font-weight:500;color:var(--muted2);line-height:1.4}
+.faq-icon{flex-shrink:0;width:16px;height:16px;border-radius:50%;border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:.52rem;color:var(--muted);transition:transform .25s,border-color .2s,color .2s;transform:rotate(45deg)}
+.faq-item.open .faq-icon{transform:rotate(0deg);border-color:rgba(168,85,247,.3);color:var(--p)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .28s cubic-bezier(.4,0,.2,1)}
+.faq-item.open .faq-a{max-height:600px} /* fallback alto — JS seta o valor real */
+.faq-a-inner{padding:0 14px 13px;font-size:.74rem;color:var(--muted);line-height:1.65;border-top:1px solid rgba(255,255,255,.045);padding-top:10px;font-weight:300}
+
+/* ── FOOTER ── */
+footer{background:#0d0b16;border-top:1px solid rgba(168,85,247,.1);padding:22px 24px 24px}
+.footer-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.footer-logo{display:flex;align-items:center;gap:7px;font-family:var(--font-display);font-weight:700;font-size:.9rem;letter-spacing:-.01em}
+.footer-socials{display:flex;gap:8px}
+.footer-icon{width:34px;height:34px;border-radius:var(--r);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;color:var(--muted);transition:all .15s}
+.footer-icon:hover{border-color:rgba(255,255,255,.14);color:var(--fg);background:rgba(255,255,255,.06)}
+.footer-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.footer-copy{font-size:.72rem;color:#475569}
+.footer-links{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.footer-sep{font-size:.68rem;color:rgba(255,255,255,.1)}
+.footer-link{font-size:.68rem;color:#3a4a58;cursor:pointer;transition:color .15s}
+.footer-link:hover{color:var(--muted)}
+@media(max-width:600px){.footer-inner{flex-direction:column;align-items:center;text-align:center}.footer-right{align-items:center}}
+
+</style>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deferred.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="deferred.css"></noscript>
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
@@ -59,24 +288,25 @@
 <!-- MODAL PAGAMENTO PIX -->
 <div class="modal-overlay" id="modal-pagamento" onclick="if(event.target===this)closeModal('modal-pagamento')">
   <div class="modal pix-modal">
-    <button class="modal-close" onclick="closeModal('modal-pagamento')"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg></button>
 
-    <!-- Header compacto -->
+    <!-- Header -->
     <div class="pix-header">
       <div class="pix-icon-badge">
         <svg width="18" height="18" viewBox="0 0 512 512" fill="currentColor"><path d="M242.4 292.5C247.8 287.1 257.1 287.1 262.5 292.5L339.5 369.5C353.7 383.7 372.6 391.5 392.6 391.5H407.7L310.6 488.6C280.3 518.1 231.1 518.1 200.8 488.6L103.3 391.2H112.6C132.6 391.2 151.5 383.4 165.7 369.2L242.4 292.5zM262.5 218.9C256.1 224.4 247.9 224.5 242.4 218.9L165.7 142.2C151.5 127.1 132.6 120.2 112.6 120.2H103.3L200.7 22.76C231.1-7.586 280.3-7.586 310.6 22.76L407.8 119.9H392.6C372.6 119.9 353.7 127.7 339.5 141.9L262.5 218.9zM112.6 142.7C126.4 142.7 139.1 148.3 149.7 158.1L226.4 234.8C233.6 241.1 243 245.6 252.5 245.6C261.9 245.6 271.3 241.1 278.5 234.8L355.5 157.8C365.3 148.1 378.8 142.5 392.6 142.5H430.3L488.6 200.8C518.9 231.1 518.9 280.3 488.6 310.6L430.3 368.9H392.6C378.8 368.9 365.3 363.3 355.5 353.6L278.5 276.6C264.6 262.7 240.3 262.7 226.4 276.6L149.7 353.2C139.1 363 126.4 368.6 112.6 368.6H80.78L22.41 310.2C-7.918 279.9-7.918 230.7 22.41 200.4L80.78 142H112.6z"/></svg>
       </div>
       <div class="pix-header-text">
         <h2 class="pix-title">Pagar com PIX</h2>
-        <p class="pix-subtitle">Instantâneo · sem taxas · seguro</p>
+        <div class="pix-valor-chip" id="pixValor">R$ 0,00</div>
       </div>
-      <div class="pix-valor-chip" id="pixValor">R$ 0,00</div>
+      <button class="pix-close-btn" onclick="closeModal('modal-pagamento')">
+          <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+          Fechar
+        </button>
     </div>
 
-    <!-- Divider -->
     <div class="pix-divider"></div>
 
-    <!-- Layout principal: QR + instruções side by side em desktop, stacked mobile -->
+    <!-- Layout principal -->
     <div class="pix-body">
 
       <!-- QR Code -->
@@ -97,11 +327,11 @@
         <div class="pix-timer-track"><div class="pix-timer-progress" id="pixTimerProgress"></div></div>
       </div>
 
-      <!-- Direita: chave + steps -->
+      <!-- Direita: chave + steps + status + fechar -->
       <div class="pix-right">
         <!-- Copiar chave -->
         <div class="pix-copy-block">
-          <div class="pix-copy-label">Chave PIX copia e cola</div>
+          <div class="pix-copy-label">Chave PIX</div>
           <div class="pix-copy-row">
             <input class="pix-copy-input" id="pixChave" readonly placeholder="Carregando chave...">
             <button class="pix-copy-btn" id="pixCopyBtn" onclick="copiarPixChave()">
@@ -132,6 +362,7 @@
           <span class="pix-status-dot"></span>
           <span class="pix-status-text">Aguardando pagamento...</span>
         </div>
+
       </div>
     </div>
   </div>
@@ -266,6 +497,10 @@
     <div class="ld-step" id="ls2"><span class="step-dot"></span><span id="ls2t">Consultando...</span></div>
     <div class="ld-step" id="ls3"><span class="step-dot"></span><span id="ls3t">Processando...</span></div>
   </div>
+  <button class="ld-cancel-btn" id="ldCancelBtn" onclick="cancelSearch()" style="display:none">
+    <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+    Cancelar
+  </button>
 </div>
 
 <!-- PAGE: HOME -->
@@ -468,23 +703,31 @@
       <div class="faq-scroll">
         <div class="faq-item" onclick="toggleFaq(this)">
           <div class="faq-q">Preciso me cadastrar?<span class="faq-icon">✕</span></div>
-          <div class="faq-a"><div class="faq-a-inner">Não. O plano Básico é gratuito — sem cadastro, sem cartão. Crie uma conta para acessar planos pagos e créditos avulsos.</div></div>
+          <div class="faq-a"><div class="faq-a-inner">Não. O plano Básico é gratuito e não exige cadastro nem cartão. Crie uma conta apenas se quiser acessar planos pagos, créditos avulsos ou salvar histórico de consultas.</div></div>
         </div>
         <div class="faq-item" onclick="toggleFaq(this)">
-          <div class="faq-q">Quais são os planos?<span class="faq-icon">✕</span></div>
-          <div class="faq-a"><div class="faq-a-inner"><strong>Básico</strong> — grátis · 7 consultas/dia<br><strong>Starter</strong> — R$5,80 · 7 dias<br><strong>Pro</strong> — R$8,90 · 15 dias<br><strong>Premium</strong> — R$14,20 · 30 dias<br><br>Prefere pagar por consulta? Compre créditos avulsos sem precisar assinar.</div></div>
+          <div class="faq-q">Quais são os planos disponíveis?<span class="faq-icon">✕</span></div>
+          <div class="faq-a"><div class="faq-a-inner"><strong>Básico</strong> — grátis · limite diário de consultas<br><strong>Starter</strong> — R$5,80 · 7 dias de acesso ampliado<br><strong>Pro</strong> — R$8,90 · 15 dias com mais módulos<br><strong>Premium</strong> — R$14,20 · 30 dias de acesso completo<br><br>Prefere pagar por uso? Compre créditos avulsos e consuma só o que precisar, sem assinar.</div></div>
         </div>
         <div class="faq-item" onclick="toggleFaq(this)">
           <div class="faq-q">Como funciona o pagamento?<span class="faq-icon">✕</span></div>
-          <div class="faq-a"><div class="faq-a-inner">Pix ou cartão. Os planos são por tempo — sem renovação automática e sem fidelidade.</div></div>
+          <div class="faq-a"><div class="faq-a-inner">Aceitamos PIX. O processo é simples: escolha seu plano ou o valor de créditos, escaneie o QR Code ou copie a chave, e pague pelo app do seu banco. O acesso é liberado automaticamente em segundos após a confirmação — sem burocracia.</div></div>
         </div>
         <div class="faq-item" onclick="toggleFaq(this)">
-          <div class="faq-q">Meus dados ficam salvos?<span class="faq-icon">✕</span></div>
-          <div class="faq-a"><div class="faq-a-inner">Não armazenamos suas consultas. O histórico, quando ativado, fica salvo na sua conta — você pode apagar a qualquer momento.</div></div>
+          <div class="faq-q">Posso cancelar um PIX que gerei?<span class="faq-icon">✕</span></div>
+          <div class="faq-a"><div class="faq-a-inner">Sim. Se você gerou um PIX mas não pagou, pode cancelá-lo diretamente na tela de pagamento ou ao tentar adquirir o mesmo plano novamente — aparecerá a opção de cancelar e gerar um novo. PIX não pagos expiram automaticamente em 15 minutos.</div></div>
         </div>
         <div class="faq-item" onclick="toggleFaq(this)">
-          <div class="faq-q">Quando o limite reseta?<span class="faq-icon">✕</span></div>
-          <div class="faq-a"><div class="faq-a-inner">Todo dia à meia-noite, por dispositivo.</div></div>
+          <div class="faq-q">Os planos renovam automaticamente?<span class="faq-icon">✕</span></div>
+          <div class="faq-a"><div class="faq-a-inner">Não. Nossos planos são pagamentos únicos por período — sem assinatura e sem renovação automática. Você paga, usa, e decide se renova quando quiser.</div></div>
+        </div>
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-q">Meus dados são armazenados?<span class="faq-icon">✕</span></div>
+          <div class="faq-a"><div class="faq-a-inner">Não registramos nem armazenamos o conteúdo das suas consultas. O histórico é opcional: quando ativado, fica vinculado à sua conta e pode ser apagado a qualquer momento por você.</div></div>
+        </div>
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-q">Quando os limites diários resetam?<span class="faq-icon">✕</span></div>
+          <div class="faq-a"><div class="faq-a-inner">À meia-noite, horário de Brasília. O contador é por dispositivo para visitantes, e por conta para usuários cadastrados.</div></div>
         </div>
       </div>
     </div>
@@ -811,6 +1054,17 @@
     <div class="confirm-btns">
       <button class="confirm-cancel" onclick="closeConfirm('confirmLogout')">Cancelar</button>
       <button class="confirm-logout" onclick="closeConfirm('confirmLogout');_doLogout()">Sair</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="confirmCancelarPlano" onclick="if(event.target===this)closeConfirm('confirmCancelarPlano')">
+  <div class="confirm-box">
+    <h3>Cancelar assinatura?</h3>
+    <p>Você perderá acesso ao plano atual e voltará para o plano Básico imediatamente.</p>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="closeConfirm('confirmCancelarPlano')">Manter plano</button>
+      <button class="confirm-logout" onclick="_confirmarCancelamentoPlano()">Cancelar assinatura</button>
     </div>
   </div>
 </div>
